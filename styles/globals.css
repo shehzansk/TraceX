@@ -1,0 +1,7 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+.upload-evidence input {
+  padding-top: 8px;
+}
