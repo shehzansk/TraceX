@@ -73,7 +73,7 @@ export default function SubmitEvidence() {
       } else {
         toast({
           title: "Failed to upload evidence.",
-          description: response.error || "An unknown error occurred.",
+          description: "You are not permitted to register cases, contact the Admin.",
           status: "error",
           duration: 5000,
           isClosable: true,
