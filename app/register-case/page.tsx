@@ -1,5 +1,3 @@
-// app/register-cases/page.tsx
-
 "use client";
 import { useRef, useState } from "react";
 import {
@@ -43,7 +41,7 @@ export default function RegisterCase() {
         toast({
           title: "All fields are required.",
           status: "error",
-          duration: 5000,
+          duration: 3000,
           isClosable: true,
         });
         setIsLoading(false);
@@ -64,7 +62,7 @@ export default function RegisterCase() {
         toast({
           title: `Case registered successfully with Case ID: ${response.newCaseId}`,
           status: "success",
-          duration: 5000,
+          duration: 3000,
           isClosable: true,
         });
         // Reset form fields
@@ -76,9 +74,9 @@ export default function RegisterCase() {
       } else {
         toast({
           title: "Failed to register case.",
-          description: response.error || "An unknown error occurred.",
+          description: "You are not permitted to register cases, contact the Admin.",
           status: "error",
-          duration: 5000,
+          duration: 3000,
           isClosable: true,
         });
       }
@@ -88,7 +86,7 @@ export default function RegisterCase() {
         title: "Error",
         description: err.message || "An unknown error occurred.",
         status: "error",
-        duration: 5000,
+        duration: 3000,
         isClosable: true,
       });
     } finally {

@@ -22,7 +22,7 @@ const TopBar = () => {
                 <Image
                     src="/gov.png"
                     alt="CCITR Logo"
-                    width={220}
+                    width={240}
                     height={180}
                 />
             </div>
@@ -39,9 +39,9 @@ const TopBar = () => {
                 }}
             >
                 <a href="/" style={linkStyle}>Home</a>
-                <a href="#about" style={linkStyle}>About</a>
-                <a href="#services" style={linkStyle}>Services</a>
-                <a href="#contact" style={linkStyle}>Contact</a>
+                <a href="/admin" style={linkStyle}>Admin</a>
+                <a href="/about" style={linkStyle}>About</a>
+                <a href="/services" style={linkStyle}>Services</a>
             </nav>
 
             {/* RIGHT SECTION */}

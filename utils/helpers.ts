@@ -1,5 +1,4 @@
 // helpers.ts
-
 import { CONTRACT_ADDRESS } from "@/const/value";
 import { abi } from "@/const/contract-abi";
 import { ethers, utils } from "ethers";
@@ -8,8 +7,8 @@ let provider: ethers.providers.Web3Provider | null = null;
 let contract: ethers.Contract | null = null;
 
 /**
- * Initializes the Ethereum provider, contract, and signer.
- * This function should only be called on the client side.
+ * Initializes the Ethereum provider and contract.
+ * Must be executed on the client side.
  */
 export const initializeProvider = () => {
   if (typeof window !== "undefined" && (window as any).ethereum) {
@@ -20,6 +19,22 @@ export const initializeProvider = () => {
   } else {
     console.log("Please install MetaMask to use this application!");
     throw new Error("MetaMask not installed");
+  }
+};
+
+/**
+ * Returns the admin address from the contract.
+ */
+export const getAdmin = async () => {
+  try {
+    if (!provider || !contract) {
+      initializeProvider();
+    }
+    const admin = await contract!.admin();
+    return admin;
+  } catch (err: any) {
+    console.error(err);
+    throw err;
   }
 };
 
@@ -36,7 +51,6 @@ export const addCase = async (
     if (!provider || !contract) {
       initializeProvider();
     }
-
     const signer = provider!.getSigner();
     const contractWithSigner = contract!.connect(signer);
 
@@ -51,6 +65,7 @@ export const addCase = async (
       status
     );
     await tx.wait();
+    // The new case ID is totalCases + 1 because totalCases was fetched before increment.
     return { newCaseId: totalCases.toNumber() + 1, status: true };
   } catch (err: any) {
     console.error(err);
@@ -58,24 +73,48 @@ export const addCase = async (
   }
 };
 
+/**
+ * addEvidence: Registers new evidence for a given case.
+ * Now expects evidenceType (a number from 0 to 7) as an additional parameter.
+ */
 export const addEvidence = async (
   caseId: string,
   evidenceDescription: string,
-  fileUrl: string
+  fileUrl: string,
+  evidenceType: number
 ) => {
   try {
     if (!provider || !contract) {
       initializeProvider();
     }
-
     const signer = provider!.getSigner();
     const contractWithSigner = contract!.connect(signer);
 
     const tx = await contractWithSigner.registerEvidence(
       caseId,
       evidenceDescription,
-      fileUrl
+      fileUrl,
+      evidenceType
     );
+    await tx.wait();
+    return { status: true };
+  } catch (err: any) {
+    console.error(err);
+    return { status: false, error: err.message };
+  }
+};
+
+/**
+ * addMember: (Admin-only) Admits a new member.
+ */
+export const addMember = async (newMember: string) => {
+  try {
+    if (!provider || !contract) {
+      initializeProvider();
+    }
+    const signer = provider!.getSigner();
+    const contractWithSigner = contract!.connect(signer);
+    const tx = await contractWithSigner.addMember(newMember);
     await tx.wait();
     return { status: true };
   } catch (err: any) {
@@ -89,9 +128,10 @@ export const getAllCases = async () => {
     if (!provider || !contract) {
       initializeProvider();
     }
-
     const caseIds = await contract!.getAllCaseIds();
     const cases = [];
+    // Assuming your getCaseById returns: 
+    // (courtId, caseId, caseDescription, caseType, petitioner, respondent, startDateTime, status, submittedBy, totalEvidences)
     for (let i = 0; i < caseIds.length; i++) {
       const caseId = caseIds[i].toNumber();
       const caseDetails = await contract!.getCaseById(caseId);
@@ -104,7 +144,8 @@ export const getAllCases = async () => {
         respondent: caseDetails[5],
         startDateTime: caseDetails[6],
         status: caseDetails[7],
-        totalEvidences: caseDetails[8].toNumber(),
+        submittedBy: caseDetails[8],
+        totalEvidences: caseDetails[9].toNumber(),
       });
     }
     return { cases, status: true };
@@ -119,20 +160,21 @@ export const getEvidences = async (caseId: string) => {
     if (!provider || !contract) {
       initializeProvider();
     }
-
+    // Expecting getCaseById to now return totalEvidences in position 9.
     const caseDetails = await contract!.getCaseById(caseId);
-    const totalEvidences = caseDetails[8].toNumber();
+    const totalEvidences = caseDetails[9].toNumber();
     const evidences = [];
     for (let j = 1; j <= totalEvidences; j++) {
+      // Expecting getEvidenceById returns: description, fileHash, timestamp, owner, evidenceType
       const evidenceDetails = await contract!.getEvidenceById(caseId, j);
       evidences.push({
         description: evidenceDetails[0],
         fileHash: evidenceDetails[1],
         timestamp: evidenceDetails[2].toNumber(),
         owner: evidenceDetails[3],
+        evidenceType: evidenceDetails[4],
       });
     }
-    // Sort evidences by their submission timestamp
     evidences.sort((a, b) => a.timestamp - b.timestamp);
     return { evidences, status: true };
   } catch (err: any) {
@@ -146,7 +188,6 @@ export const getUserCases = async (userAddress: string) => {
     if (!provider || !contract) {
       initializeProvider();
     }
-
     const caseIds = await contract!.getUserCases(userAddress);
     const cases = [];
     for (let i = 0; i < caseIds.length; i++) {
@@ -161,7 +202,8 @@ export const getUserCases = async (userAddress: string) => {
         respondent: caseDetails[5],
         startDateTime: caseDetails[6],
         status: caseDetails[7],
-        totalEvidences: caseDetails[8].toNumber(),
+        submittedBy: caseDetails[8],
+        totalEvidences: caseDetails[9].toNumber(),
       });
     }
     return { cases, status: true };
@@ -176,7 +218,6 @@ export const getCaseById = async (caseId: string) => {
     if (!provider || !contract) {
       initializeProvider();
     }
-
     const caseDetails = await contract!.getCaseById(caseId);
     const formattedCase = {
       courtId: caseDetails[0],
@@ -187,7 +228,8 @@ export const getCaseById = async (caseId: string) => {
       respondent: caseDetails[5],
       startDateTime: caseDetails[6],
       status: caseDetails[7],
-      totalEvidences: caseDetails[8].toNumber(),
+      submittedBy: caseDetails[8],
+      totalEvidences: caseDetails[9].toNumber(),
     };
     return { caseDetails: formattedCase, status: true };
   } catch (err: any) {
@@ -201,7 +243,6 @@ export const tipEvidence = async (address: string, amount: string) => {
     if (!provider || !contract) {
       initializeProvider();
     }
-
     const signer = provider!.getSigner();
     const contractWithSigner = contract!.connect(signer);
 
@@ -222,3 +263,9 @@ export function convertIPFSUriToUrl(ipfsUri: string): string {
   }
   return ipfsUri;
 }
+export const isMember = async (userAddress: string): Promise<boolean> => {
+  if (!provider || !contract) {
+    initializeProvider();
+  }
+  return await contract!.members(userAddress);
+};

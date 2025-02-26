@@ -28,7 +28,7 @@ export default function HomePage() {
   return (
     <div className="bg-white text-black min-h-screen">
       {/* Enlarged Slideshow Section */}
-      <div className="relative h-[520px] overflow-hidden mt-8 border-b border-gray-300">
+      <div className="relative h-[560px] overflow-hidden mt-8 border-b border-gray-300">
         <AnimatePresence mode="wait">
           <motion.div
             key={currentImageIndex}
@@ -57,16 +57,17 @@ export default function HomePage() {
         </button>
       </div>
 
-      <section className="flex flex-col items-center justify-center gap-8 py-4 md:py-10">
-        <div className="inline-block max-w-lg text-center mt-12">
+      <section className="flex flex-col items-center justify-center gap-8 py-4 md:py-10 px-4 md:px-8">
+        <div className="inline-block max-w-lg text-center mt-6">
           <h1 className="text-5xl font-bold">Blockchain for&nbsp;</h1>
-          <h1 className="text-5xl font-bold text-cyan-500">Justice.&nbsp;</h1>
+          <h1 className="text-5xl font-bold text-cyan-500">Justice&nbsp;</h1>
           <br />
           <h2 className="text-xl mt-4">
-            A blockchain-based evidence management system to prevent manipulation in courts.
+            A ready-to-use, blockchain-based evidence management system to preserve the sanctity of evidences presented in courts.
           </h2>
         </div>
       </section>
+
       <FeatureBoxes />
     </div>
   );

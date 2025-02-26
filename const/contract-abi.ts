@@ -1,5 +1,18 @@
 export const abi = [
   {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "_member",
+        "type": "address"
+      }
+    ],
+    "name": "addMember",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
     "inputs": [],
     "stateMutability": "nonpayable",
     "type": "constructor"
@@ -42,6 +55,12 @@ export const abi = [
         "internalType": "string",
         "name": "respondent",
         "type": "string"
+      },
+      {
+        "indexed": false,
+        "internalType": "address",
+        "name": "submittedBy",
+        "type": "address"
       },
       {
         "indexed": false,
@@ -94,6 +113,12 @@ export const abi = [
       },
       {
         "indexed": false,
+        "internalType": "enum SecurexPrivate.EvidenceType",
+        "name": "evidenceType",
+        "type": "uint8"
+      },
+      {
+        "indexed": false,
         "internalType": "address",
         "name": "owner",
         "type": "address"
@@ -113,18 +138,12 @@ export const abi = [
     "inputs": [
       {
         "indexed": false,
-        "internalType": "uint256",
-        "name": "tipAmount",
-        "type": "uint256"
-      },
-      {
-        "indexed": false,
-        "internalType": "address payable",
-        "name": "author",
+        "internalType": "address",
+        "name": "member",
         "type": "address"
       }
     ],
-    "name": "EvidenceTipped",
+    "name": "MemberAdded",
     "type": "event"
   },
   {
@@ -186,6 +205,11 @@ export const abi = [
         "internalType": "string",
         "name": "_fileHash",
         "type": "string"
+      },
+      {
+        "internalType": "uint8",
+        "name": "_evidenceType",
+        "type": "uint8"
       }
     ],
     "name": "registerEvidence",
@@ -204,6 +228,19 @@ export const abi = [
     "name": "tipEvidenceOwner",
     "outputs": [],
     "stateMutability": "payable",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "admin",
+    "outputs": [
+      {
+        "internalType": "address",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "view",
     "type": "function"
   },
   {
@@ -276,6 +313,11 @@ export const abi = [
         "type": "string"
       },
       {
+        "internalType": "address",
+        "name": "submittedBy",
+        "type": "address"
+      },
+      {
         "internalType": "uint256",
         "name": "totalEvidences",
         "type": "uint256"
@@ -284,6 +326,19 @@ export const abi = [
         "internalType": "bool",
         "name": "initialised",
         "type": "bool"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "getAdmin",
+    "outputs": [
+      {
+        "internalType": "address",
+        "name": "",
+        "type": "address"
       }
     ],
     "stateMutability": "view",
@@ -314,47 +369,52 @@ export const abi = [
     "outputs": [
       {
         "internalType": "string",
-        "name": "courtId",
+        "name": "",
         "type": "string"
       },
       {
         "internalType": "uint256",
-        "name": "caseId",
+        "name": "",
         "type": "uint256"
       },
       {
         "internalType": "string",
-        "name": "caseDescription",
+        "name": "",
         "type": "string"
       },
       {
         "internalType": "string",
-        "name": "caseType",
+        "name": "",
         "type": "string"
       },
       {
         "internalType": "string",
-        "name": "petitioner",
+        "name": "",
         "type": "string"
       },
       {
         "internalType": "string",
-        "name": "respondent",
+        "name": "",
         "type": "string"
       },
       {
         "internalType": "string",
-        "name": "startDateTime",
+        "name": "",
         "type": "string"
       },
       {
         "internalType": "string",
-        "name": "status",
+        "name": "",
         "type": "string"
+      },
+      {
+        "internalType": "address",
+        "name": "",
+        "type": "address"
       },
       {
         "internalType": "uint256",
-        "name": "totalEvidences",
+        "name": "",
         "type": "uint256"
       }
     ],
@@ -378,23 +438,28 @@ export const abi = [
     "outputs": [
       {
         "internalType": "string",
-        "name": "description",
+        "name": "",
         "type": "string"
       },
       {
         "internalType": "string",
-        "name": "fileHash",
+        "name": "",
         "type": "string"
       },
       {
         "internalType": "uint256",
-        "name": "timestamp",
+        "name": "",
         "type": "uint256"
       },
       {
         "internalType": "address",
-        "name": "owner",
+        "name": "",
         "type": "address"
+      },
+      {
+        "internalType": "enum SecurexPrivate.EvidenceType",
+        "name": "",
+        "type": "uint8"
       }
     ],
     "stateMutability": "view",
@@ -420,13 +485,19 @@ export const abi = [
     "type": "function"
   },
   {
-    "inputs": [],
-    "name": "name",
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "name": "members",
     "outputs": [
       {
-        "internalType": "string",
+        "internalType": "bool",
         "name": "",
-        "type": "string"
+        "type": "bool"
       }
     ],
     "stateMutability": "view",
