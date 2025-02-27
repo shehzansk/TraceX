@@ -1,61 +1,130 @@
 "use client";
+import { Colors } from 'chart.js';
 import { useEffect, useState, useRef } from "react";
 import {
     Box,
     Heading,
     Text,
     VStack,
+    HStack,
     Spinner,
     Alert,
     AlertIcon,
-    Card,
-    CardHeader,
-    CardBody,
     Button,
+    useDisclosure,
+    useToast,
+    Input,
     Modal,
     ModalOverlay,
     ModalContent,
     ModalHeader,
-    ModalBody,
     ModalCloseButton,
+    ModalBody,
+    ModalFooter,
     FormControl,
     FormLabel,
-    Input,
     Textarea,
-    useDisclosure,
-    useToast,
     Select,
-    Link,
-    Icon,
 } from "@chakra-ui/react";
-import { getCaseById, getEvidences, addEvidence, convertIPFSUriToUrl } from "@/utils/helpers";
-import { useStorageUpload } from "@thirdweb-dev/react";
 import { useRouter } from "next/navigation";
-import { FiDownload } from "react-icons/fi";
-import { Document, Page, pdfjs } from "react-pdf";
+import {
+    getCaseById,
+    getEvidences,
+    isAtLeastAnalyst,
+    isCollectorOrAdmin,
+    addEvidence,
+    convertIPFSUriToUrl,
+    getName,
+} from "@/utils/helpers";
+import axios from "axios";
+import { Chart } from "react-chartjs-2";
+import {
+    CategoryScale,
+    Chart as ChartJS,
+    LinearScale,
+    BarElement,
+    TimeScale,
+    Tooltip,
+    BubbleController,
+    PointElement,
+} from "chart.js";
+import "chartjs-adapter-date-fns";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
+import { useStorageUpload } from "@thirdweb-dev/react";
+import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
 
-pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`;
+// Register the necessary Chart.js controllers/elements
+ChartJS.register(
+    CategoryScale,
+    LinearScale,
+    BarElement,
+    TimeScale,
+    Tooltip,
+    BubbleController,
+    PointElement,
+    Colors
+);
 
-export default function CaseDetails({ params }: { params: { caseId: string } }) {
+export default function CaseDetails({ params }) {
     const router = useRouter();
     const { caseId } = params;
-    const [caseDetails, setCaseDetails] = useState<any>(null);
-    const [evidences, setEvidences] = useState<any[]>([]);
-    const [loading, setLoading] = useState<boolean>(true);
-    const [error, setError] = useState<string>("");
-    const { isOpen, onOpen, onClose } = useDisclosure();
-    const [isSubmittingEvidence, setIsSubmittingEvidence] = useState<boolean>(false);
-    const [file, setFile] = useState<File[]>([]);
-    const { mutateAsync: upload } = useStorageUpload();
-    const evidenceDescriptionRef = useRef<HTMLTextAreaElement>(null);
+    const [caseDetails, setCaseDetails] = useState(null);
+    const [evidences, setEvidences] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [hasAccess, setHasAccess] = useState(false);
+    const [canEdit, setCanEdit] = useState(false);
+    const [error, setError] = useState("");
+    const [searchQuery, setSearchQuery] = useState("");
+    const [filteredEvidences, setFilteredEvidences] = useState([]);
+    const [auditTrail, setAuditTrail] = useState(null);
+    const [auditLoading, setAuditLoading] = useState(false);
+    const [aiReport, setAiReport] = useState("");
+    const { isOpen: isAuditOpen, onOpen: onAuditOpen, onClose: onAuditClose } = useDisclosure();
+    const { isOpen: isReportOpen, onOpen: onReportOpen, onClose: onReportClose } = useDisclosure();
+    const { isOpen: isEvidenceOpen, onOpen: onEvidenceOpen, onClose: onEvidenceClose } = useDisclosure();
     const toast = useToast();
+    const [isSubmittingEvidence, setIsSubmittingEvidence] = useState(false);
+    const [file, setFile] = useState([]);
+    const [evidenceType, setEvidenceType] = useState(0);
+    const evidenceIdRef = useRef(null);
+    const officerNameRef = useRef(null);
+    const locationRef = useRef(null);
+    const evidenceDescriptionRef = useRef(null);
 
-    // State for evidence type (0-7)
-    const [evidenceType, setEvidenceType] = useState<number>(0);
+    const closeAllModals = () => {
+        onEvidenceClose();
+        onAuditClose();
+        onReportClose();
+    };
+
+    const openEvidenceModal = () => {
+        closeAllModals();
+        onEvidenceOpen();
+    };
+
+    const openAuditModal = () => {
+        closeAllModals();
+        onAuditOpen();
+    };
+
+    const openReportModal = () => {
+        closeAllModals();
+        onReportOpen();
+    };
 
     useEffect(() => {
-        const fetchCaseDetails = async () => {
+        const fetchData = async () => {
             try {
+                const access = await isAtLeastAnalyst();
+                setHasAccess(access);
+                if (!access) {
+                    setError("You do not have permission to view this page.");
+                    setLoading(false);
+                    return;
+                }
+                const editAccess = await isCollectorOrAdmin();
+                setCanEdit(editAccess);
                 const caseResponse = await getCaseById(caseId);
                 const evidenceResponse = await getEvidences(caseId);
                 if (caseResponse.status) {
@@ -65,21 +134,263 @@ export default function CaseDetails({ params }: { params: { caseId: string } }) 
                 }
                 if (evidenceResponse.status) {
                     setEvidences(evidenceResponse.evidences);
+                    setFilteredEvidences(evidenceResponse.evidences);
                 } else {
                     setError(evidenceResponse.error || "Failed to fetch evidences.");
                 }
-            } catch (err: any) {
+            } catch (err) {
                 console.error(err);
                 setError(err.message || "An unknown error occurred.");
             } finally {
                 setLoading(false);
             }
         };
+        fetchData();
 
-        fetchCaseDetails();
+        const fetchOfficerName = async () => {
+            if (officerNameRef.current) {
+                const signerAddress = (await window.ethereum.request({ method: "eth_accounts" }))[0];
+                const name = await getName(signerAddress);
+                if (name) {
+                    officerNameRef.current.value = name;
+                }
+            }
+        };
+        fetchOfficerName();
+        getLocation();
     }, [caseId]);
 
-    const uploadDataToIPFS = async (): Promise<string> => {
+    const getLocation = () => {
+        if ("geolocation" in navigator && locationRef.current) {
+            navigator.geolocation.getCurrentPosition(
+                (position) => {
+                    const coords = `${position.coords.latitude}, ${position.coords.longitude}`;
+                    locationRef.current.value = coords;
+                },
+                (error) => {
+                    console.error("Error getting location:", error);
+                }
+            );
+        }
+    };
+
+    const handleSearch = (e) => {
+        const query = e.target.value.toLowerCase();
+        setSearchQuery(query);
+        setFilteredEvidences(
+            evidences.filter(
+                (evidence) =>
+                    evidence.evidenceId.toString().includes(query) ||
+                    evidence.description.toLowerCase().includes(query)
+            )
+        );
+    };
+
+    const fetchAuditTrail = async (evidenceId) => {
+        try {
+            setAuditLoading(true);
+            const response = await axios.get(`/api/auditTrail/${evidenceId}`);
+            if (response.data.success) {
+                setAuditTrail(response.data.data);
+                openAuditModal();
+            } else {
+                toast({
+                    title: "Audit trail not found.",
+                    status: "error",
+                    duration: 5000,
+                    isClosable: true,
+                });
+            }
+        } catch (err) {
+            console.error(err);
+            toast({
+                title: "Error fetching audit trail.",
+                description: err.message || "An unknown error occurred.",
+                status: "error",
+                duration: 5000,
+                isClosable: true,
+            });
+        } finally {
+            setAuditLoading(false);
+        }
+    };
+
+    const generateAIReport = async () => {
+        try {
+            openReportModal();
+            const caseData = {
+                caseDetails,
+                evidences,
+            };
+            const aiResponse = await generateAIReportContent(caseData);
+            setAiReport(aiResponse);
+        } catch (err) {
+            console.error(err);
+            toast({
+                title: "Error generating AI audit report.",
+                description: err.message || "An unknown error occurred.",
+                status: "error",
+                duration: 5000,
+                isClosable: true,
+            });
+            onReportClose();
+        }
+    };
+
+    const generateAIReportContent = async (data) => {
+        const prompt = `You are an AI assistant tasked with generating a comprehensive audit report for a legal case to be presented in Indian courts. Use the provided case details and evidence data to create a formal report.
+Case Details:
+Court ID: ${data.caseDetails.courtId}
+Case ID: ${data.caseDetails.caseId}
+Case Description: ${data.caseDetails.caseDescription}
+Case Type: ${data.caseDetails.caseType}
+Petitioner: ${data.caseDetails.petitioner}
+Respondent: ${data.caseDetails.respondent}
+Status: ${data.caseDetails.status}
+Start Date: ${data.caseDetails.startDateTime}
+Submitted By: ${data.caseDetails.submittedBy}
+Evidences:
+${data.evidences
+                .map(
+                    (evidence) =>
+                        `Evidence ID: ${evidence.evidenceId}
+Description: ${evidence.description}
+Officer Name: ${evidence.officerName}
+Location: ${evidence.location}
+Evidence Type: ${evidence.evidenceType}
+Timestamp: ${new Date(evidence.timestamp * 1000).toLocaleString()}`
+                )
+                .join("\n")}
+Instructions:
+- Summarize the case and its significance.
+- Detail each piece of evidence and its relevance.
+- Present findings in a logical, clear, and concise manner.
+- Use formal language suitable for a court presentation.
+- Ensure the report is organized with headings and sections.`;
+        const llm = new ChatGoogleGenerativeAI({
+            model: "gemini-1.5-pro",
+            temperature: 0,
+            apiKey: process.env.NEXT_PUBLIC_GOOGLE_API_KEY,
+        });
+        const response = await llm.invoke([{ role: "user", content: prompt }]);
+        const aiReportContent = response.content?.trim();
+        if (!aiReportContent) {
+            throw new Error("Failed to generate AI report.");
+        }
+        return aiReportContent;
+    };
+
+    const downloadPDF = () => {
+        const doc = new jsPDF();
+        doc.setFontSize(16);
+        doc.text("AI Audit Report", 105, 20, { align: "center" });
+        const lines = doc.splitTextToSize(aiReport, 180);
+        doc.setFontSize(12);
+        doc.text(lines, 15, 30);
+        doc.save(`AI_Audit_Report_Case_${caseId}.pdf`);
+    };
+
+    // ******************** New Bubble Chart Code ********************
+    // Build an array of events including the case registration and evidences.
+    let bubbleEvents = [];
+    if (caseDetails) {
+        bubbleEvents.push({
+            x: new Date(caseDetails.startDateTime),
+            y: 1,
+            r: 8,
+            label: "Case Registered",
+            type: "caseRegistered",
+        });
+    }
+    if (evidences.length > 0) {
+        // Group evidences by day to handle multiple events on the same date
+        const grouped = {};
+        evidences.forEach((evidence) => {
+            const day = new Date(evidence.timestamp * 1000).toDateString();
+            if (!grouped[day]) grouped[day] = [];
+            grouped[day].push(evidence);
+        });
+        // Set a small offset to vertically jitter events on the same day
+        const offset = 0.3;
+        Object.keys(grouped).forEach((day) => {
+            const eventsForDay = grouped[day];
+            // Optional: sort events by timestamp
+            eventsForDay.sort((a, b) => a.timestamp - b.timestamp);
+            const n = eventsForDay.length;
+            eventsForDay.forEach((evidence, index) => {
+                const y = 1 + ((index - (n - 1) / 2) * offset);
+                bubbleEvents.push({
+                    x: new Date(evidence.timestamp * 1000),
+                    y: y,
+                    r: 8,
+                    label: `Evidence ID: ${evidence.evidenceId}`,
+                    description: evidence.description,
+                    officerName: evidence.officerName,
+                    location: evidence.location,
+                    type: "evidence",
+                });
+            });
+        });
+    }
+    const bubbleData = {
+        datasets: [
+            {
+                label: "Case Timeline",
+                data: bubbleEvents,
+            },
+        ],
+    };
+
+    const bubbleOptions = {
+        scales: {
+            x: {
+                type: "time",
+                time: {
+                    unit: "day",
+                },
+                title: {
+                    display: true,
+                    text: "Date",
+                },
+            },
+            y: {
+                display: false, // Hide y-axis since it's used only for jittering.
+            },
+        },
+        plugins: {
+            colors: {
+                forceOverride: true
+            },
+            tooltip: {
+                callbacks: {
+                    label: function (context) {
+                        const dataPoint = context.raw;
+                        if (dataPoint.type === "caseRegistered") {
+                            return [
+                                dataPoint.label,
+                                `Date: ${new Date(dataPoint.x).toLocaleString()}`,
+                            ];
+                        }
+                        return [
+                            dataPoint.label,
+                            `Description: ${dataPoint.description}`,
+                            `Officer: ${dataPoint.officerName}`,
+                            `Location: ${dataPoint.location}`,
+                            `Date: ${new Date(dataPoint.x).toLocaleString()}`,
+                        ];
+                    },
+                },
+            },
+            legend: {
+                display: true,
+            },
+        },
+    };
+
+    // ******************** End Bubble Chart Code ********************
+
+    const { mutateAsync: upload } = useStorageUpload();
+    const uploadDataToIPFS = async () => {
         const uris = await upload({ data: file });
         return uris[0];
     };
@@ -87,9 +398,27 @@ export default function CaseDetails({ params }: { params: { caseId: string } }) 
     const handleAddEvidence = async () => {
         setIsSubmittingEvidence(true);
         try {
-            if (!evidenceDescriptionRef.current?.value || file.length === 0) {
+            if (
+                !evidenceIdRef.current?.value ||
+                !officerNameRef.current?.value ||
+                !locationRef.current?.value ||
+                !evidenceDescriptionRef.current?.value ||
+                file.length === 0
+            ) {
                 toast({
                     title: "All fields are required.",
+                    status: "error",
+                    duration: 5000,
+                    isClosable: true,
+                });
+                setIsSubmittingEvidence(false);
+                return;
+            }
+            const evidenceId = parseInt(evidenceIdRef.current.value);
+            if (isNaN(evidenceId) || evidenceId < 100000 || evidenceId > 999999) {
+                toast({
+                    title: "Invalid Evidence ID",
+                    description: "Evidence ID must be a 6-digit number.",
                     status: "error",
                     duration: 5000,
                     isClosable: true,
@@ -101,34 +430,40 @@ export default function CaseDetails({ params }: { params: { caseId: string } }) 
             ipfsLink = convertIPFSUriToUrl(ipfsLink);
             const response = await addEvidence(
                 caseId,
+                evidenceId,
+                officerNameRef.current.value,
+                locationRef.current.value,
                 evidenceDescriptionRef.current.value,
                 ipfsLink,
                 evidenceType
             );
             if (response.status) {
                 toast({
-                    title: "Evidence uploaded successfully.",
+                    title: "Evidence submitted successfully.",
                     status: "success",
                     duration: 5000,
                     isClosable: true,
                 });
+                evidenceIdRef.current.value = "";
                 evidenceDescriptionRef.current.value = "";
                 setFile([]);
-                onClose();
+                setEvidenceType(0);
                 const evidenceResponse = await getEvidences(caseId);
                 if (evidenceResponse.status) {
                     setEvidences(evidenceResponse.evidences);
+                    setFilteredEvidences(evidenceResponse.evidences);
                 }
+                onEvidenceClose();
             } else {
                 toast({
-                    title: "Failed to upload evidence.",
+                    title: "Failed to submit evidence.",
                     description: response.error || "An unknown error occurred.",
                     status: "error",
                     duration: 5000,
                     isClosable: true,
                 });
             }
-        } catch (err: any) {
+        } catch (err) {
             console.error(err);
             toast({
                 title: "Error",
@@ -142,22 +477,6 @@ export default function CaseDetails({ params }: { params: { caseId: string } }) 
         }
     };
 
-    // We'll use a simple download link for non-image evidences.
-    const renderEvidenceContent = (evidence: any) => {
-        const fileUrl = evidence.fileHash;
-        const fileName = fileUrl.split("/").pop() || "File";
-        return (
-            <Box display="flex" alignItems="center" justifyContent="space-between">
-                <Text>{fileName}</Text>
-                <Link href={fileUrl} isExternal color="teal.500" download>
-                    <Button leftIcon={<FiDownload />} variant="outline">
-                        Download
-                    </Button>
-                </Link>
-            </Box>
-        );
-    };
-
     if (loading) {
         return (
             <Box className="min-h-screen flex justify-center items-center">
@@ -165,79 +484,161 @@ export default function CaseDetails({ params }: { params: { caseId: string } }) 
             </Box>
         );
     }
-
-    if (error) {
+    if (!hasAccess) {
         return (
             <Box className="min-h-screen flex justify-center items-center">
                 <Alert status="error">
                     <AlertIcon />
-                    {error}
+                    {error || "You do not have permission to view this page."}
                 </Alert>
             </Box>
         );
     }
 
     return (
-        <Box className="min-h-screen p-6 max-w-4xl mx-auto">
+        <Box className="min-h-screen p-6 max-w-6xl mx-auto">
             <Heading as="h1" size="lg" mb={6}>
                 Case Details (ID: {caseId})
             </Heading>
-            {caseDetails && (
-                <>
-                    <Text><strong>Court ID:</strong> {caseDetails.courtId}</Text>
-                    <Text><strong>Case Description:</strong> {caseDetails.caseDescription}</Text>
-                    <Text><strong>Case Type:</strong> {caseDetails.caseType}</Text>
-                    <Text><strong>Petitioner:</strong> {caseDetails.petitioner}</Text>
-                    <Text><strong>Respondent:</strong> {caseDetails.respondent}</Text>
-                    <Text><strong>Status:</strong> {caseDetails.status}</Text>
-                    <Text><strong>Start Date:</strong> {caseDetails.startDateTime}</Text>
-                    <Text><strong>Submitted By:</strong> {caseDetails.submittedBy}</Text>
-                </>
-            )}
-
-            <Box mt={8} mb={4} display="flex" justifyContent="space-between" alignItems="center">
-                <Heading as="h2" size="md">
-                    Evidence Timeline
+            <Box display="flex" flexDirection={["column", "column", "row"]} gap={6}>
+                <Box flex="1">
+                    {caseDetails && (
+                        <>
+                            <Text>
+                                <strong>Court ID:</strong> {caseDetails.courtId}
+                            </Text>
+                            <Text>
+                                <strong>Case Description:</strong> {caseDetails.caseDescription}
+                            </Text>
+                            <Text>
+                                <strong>Case Type:</strong> {caseDetails.caseType}
+                            </Text>
+                            <Text>
+                                <strong>Petitioner:</strong> {caseDetails.petitioner}
+                            </Text>
+                            <Text>
+                                <strong>Respondent:</strong> {caseDetails.respondent}
+                            </Text>
+                            <Text>
+                                <strong>Status:</strong> {caseDetails.status}
+                            </Text>
+                            <Text>
+                                <strong>Start Date:</strong>{" "}
+                                {new Date(caseDetails.startDateTime).toLocaleDateString()}
+                            </Text>
+                            <Text>
+                                <strong>Submitted By:</strong> {caseDetails.submittedBy}
+                            </Text>
+                        </>
+                    )}
+                    <Button colorScheme="teal" mt={4} onClick={generateAIReport}>
+                        Generate AI Audit Report
+                    </Button>
+                    {canEdit && (
+                        <Button colorScheme="teal" mt={4} ml={2} onClick={openEvidenceModal}>
+                            + Add Evidence
+                        </Button>
+                    )}
+                </Box>
+                <Box flex="1">
+                    <Heading as="h2" size="md" mb={4}>
+                        Case Timeline
+                    </Heading>
+                    {bubbleEvents.length > 0 ? (
+                        <Chart type="bubble" data={bubbleData} options={bubbleOptions} />
+                    ) : (
+                        <Text>No evidences to display in the timeline.</Text>
+                    )}
+                </Box>
+            </Box>
+            <Box mt={8}>
+                <Heading as="h2" size="md" mb={4}>
+                    Evidences
                 </Heading>
-                <Button colorScheme="teal" onClick={onOpen}>
-                    + Add Evidence
-                </Button>
+                <Input
+                    placeholder="Search evidences by ID or description..."
+                    value={searchQuery}
+                    onChange={handleSearch}
+                    mb={4}
+                />
+                {filteredEvidences.length > 0 ? (
+                    <VStack spacing={4} align="stretch">
+                        {filteredEvidences.map((evidence, index) => (
+                            <Box
+                                key={index}
+                                p={4}
+                                borderWidth="1px"
+                                borderRadius="md"
+                                _hover={{ bg: "gray.50" }}
+                            >
+                                <Text>
+                                    <strong>Evidence ID:</strong> {evidence.evidenceId}
+                                </Text>
+                                <Text>
+                                    <strong>Description:</strong> {evidence.description}
+                                </Text>
+                                <Text>
+                                    <strong>Date:</strong> {new Date(evidence.timestamp * 1000).toLocaleString()}
+                                </Text>
+                                <Text>
+                                    <strong>Officer Name:</strong> {evidence.officerName}
+                                </Text>
+                                <Text>
+                                    <strong>Location:</strong> {evidence.location}
+                                </Text>
+                                <Text>
+                                    <strong>File Hash URL:</strong>{" "}
+                                    <a href={evidence.fileHash} target="_blank" rel="noopener noreferrer">
+                                        {evidence.fileHash}
+                                    </a>
+                                </Text>
+                                <Text>
+                                    <strong>Submitted By:</strong> {evidence.owner}
+                                </Text>
+                                <HStack spacing={4} justify="flex-end" mt={2}>
+                                    <Button
+                                        onClick={() => fetchAuditTrail(evidence.evidenceId)}
+                                        colorScheme="blue"
+                                    >
+                                        View Audit Trail
+                                    </Button>
+                                    <Button
+                                        as="a"
+                                        href={evidence.fileHash}
+                                        download
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        colorScheme="teal"
+                                    >
+                                        Download Evidence
+                                    </Button>
+                                </HStack>
+                            </Box>
+                        ))}
+                    </VStack>
+                ) : (
+                    <Text>No evidences found.</Text>
+                )}
             </Box>
 
-            {evidences.length > 0 ? (
-                <VStack spacing={6} align="stretch">
-                    {evidences.map((evidence, index) => (
-                        <Card key={index}>
-                            <CardHeader>
-                                <Text><strong>Description:</strong> {evidence.description}</Text>
-                                <Text>
-                                    <strong>Date:</strong>{" "}
-                                    {new Date(evidence.timestamp * 1000).toLocaleString()}
-                                </Text>
-                                <Text wordBreak="break-all">
-                                    <strong>File Hash:</strong> {evidence.fileHash}
-                                </Text>
-                                <Text>
-                                    <strong>Evidence Type:</strong> {evidence.evidenceType}
-                                </Text>
-                            </CardHeader>
-                            <CardBody>{renderEvidenceContent(evidence)}</CardBody>
-                        </Card>
-                    ))}
-                </VStack>
-            ) : (
-                <Text>No evidences found for this case.</Text>
-            )}
-
-            <Modal isOpen={isOpen} onClose={onClose} isCentered>
+            {/* Evidence Modal */}
+            <Modal isOpen={isEvidenceOpen} onClose={onEvidenceClose} size="xl">
                 <ModalOverlay />
                 <ModalContent>
-                    <ModalHeader>Submit Evidence</ModalHeader>
+                    <ModalHeader>Add Evidence</ModalHeader>
                     <ModalCloseButton />
                     <ModalBody>
-                        <FormControl id="evidenceDescription" mb={4} isRequired>
-                            <FormLabel>Evidence Description</FormLabel>
-                            <Textarea placeholder="Enter evidence description" ref={evidenceDescriptionRef} />
+                        <FormControl id="evidenceId" mb={4} isRequired>
+                            <FormLabel>Evidence ID (6-digit number)</FormLabel>
+                            <Input placeholder="Enter evidence ID" ref={evidenceIdRef} />
+                        </FormControl>
+                        <FormControl id="officerName" mb={4} isRequired>
+                            <FormLabel>Officer Name</FormLabel>
+                            <Input placeholder="Enter officer name" ref={officerNameRef} />
+                        </FormControl>
+                        <FormControl id="location" mb={4} isRequired>
+                            <FormLabel>Location</FormLabel>
+                            <Input placeholder="Enter location" ref={locationRef} />
                         </FormControl>
                         <FormControl id="evidenceType" mb={4} isRequired>
                             <FormLabel>Evidence Type</FormLabel>
@@ -247,8 +648,8 @@ export default function CaseDetails({ params }: { params: { caseId: string } }) 
                                 onChange={(e) => setEvidenceType(Number(e.target.value))}
                             >
                                 <option value="0">Forensic Evidence</option>
-                                <option value="1">Computer‑Based Evidence</option>
-                                <option value="2">Network & Internet‑Based Evidence</option>
+                                <option value="1">Computer-Based Evidence</option>
+                                <option value="2">Network & Internet-Based Evidence</option>
                                 <option value="3">Social Media & Communication Evidence</option>
                                 <option value="4">Mobile Device Evidence (GPS Data)</option>
                                 <option value="5">Cybercrime Evidence</option>
@@ -256,26 +657,99 @@ export default function CaseDetails({ params }: { params: { caseId: string } }) 
                                 <option value="7">Financial & Transactional Evidence</option>
                             </Select>
                         </FormControl>
+                        <FormControl id="evidenceDescription" mb={4} isRequired>
+                            <FormLabel>Evidence Description</FormLabel>
+                            <Textarea placeholder="Enter evidence description" ref={evidenceDescriptionRef} />
+                        </FormControl>
                         <FormControl id="file" mb={6} isRequired>
                             <FormLabel>Upload Evidence File</FormLabel>
                             <Input
                                 type="file"
-                                accept="*"
-                                onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                                    setFile(e.target.files ? Array.from(e.target.files) : [])
-                                }
+                                accept=""
+                                onChange={(e) => setFile(e.target.files ? Array.from(e.target.files) : [])}
                             />
                         </FormControl>
-                        <Button
-                            colorScheme="teal"
-                            isLoading={isSubmittingEvidence}
-                            onClick={handleAddEvidence}
-                            width="full"
-                            mb={4}
-                        >
+                    </ModalBody>
+                    <ModalFooter>
+                        <Button colorScheme="teal" isLoading={isSubmittingEvidence} onClick={handleAddEvidence}>
                             Submit Evidence
                         </Button>
+                        <Button variant="ghost" onClick={onEvidenceClose}>
+                            Cancel
+                        </Button>
+                    </ModalFooter>
+                </ModalContent>
+            </Modal>
+
+            {/* Audit Trail Modal */}
+            <Modal isOpen={isAuditOpen} onClose={onAuditClose} size="xl">
+                <ModalOverlay />
+                <ModalContent>
+                    <ModalHeader>Audit Trail</ModalHeader>
+                    <ModalCloseButton />
+                    <ModalBody>
+                        {auditLoading ? (
+                            <Spinner />
+                        ) : auditTrail ? (
+                            <Box>
+                                <Text>
+                                    <strong>Evidence ID:</strong> {auditTrail.evidenceId}
+                                </Text>
+                                <VStack spacing={3} align="stretch" mt={4}>
+                                    {auditTrail.actions.map((action, index) => (
+                                        <Box key={index} p={3} borderWidth="1px" borderRadius="md">
+                                            <Text>
+                                                <strong>Action Type:</strong> {action.actionType}
+                                            </Text>
+                                            <Text>
+                                                <strong>User Address:</strong> {action.userAddress}
+                                            </Text>
+                                            <Text>
+                                                <strong>Timestamp:</strong> {new Date(action.timestamp).toLocaleString()}
+                                            </Text>
+                                            <Text>
+                                                <strong>Details:</strong> {action.details}
+                                            </Text>
+                                            <Text>
+                                                <strong>TransactionHash:</strong> {action.transactionHash}
+                                            </Text>
+                                            <Text>
+                                                <strong>Block Number:</strong> {action.blockNumber}
+                                            </Text>
+                                        </Box>
+                                    ))}
+                                </VStack>
+                            </Box>
+                        ) : (
+                            <Text>No audit trail available.</Text>
+                        )}
                     </ModalBody>
+                </ModalContent>
+            </Modal>
+
+            {/* AI Audit Report Modal */}
+            <Modal isOpen={isReportOpen} onClose={onReportClose} size="xl">
+                <ModalOverlay />
+                <ModalContent>
+                    <ModalHeader>AI Audit Report</ModalHeader>
+                    <ModalCloseButton />
+                    <ModalBody>
+                        {aiReport ? (
+                            <Box>
+                                <Text whiteSpace="pre-wrap">{aiReport}</Text>
+                            </Box>
+                        ) : (
+                            <Spinner />
+                        )}
+                    </ModalBody>
+                    <ModalFooter>
+                        <Button colorScheme="teal" onClick={downloadPDF} mr={3}>
+                            Download PDF
+                        </Button>
+                        <Button variant="ghost" onClick={onReportClose}>
+                            Close
+                        </Button>
+                    </ModalFooter>
                 </ModalContent>
             </Modal>
         </Box>

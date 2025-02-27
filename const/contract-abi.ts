@@ -5,6 +5,16 @@ export const abi = [
         "internalType": "address",
         "name": "_member",
         "type": "address"
+      },
+      {
+        "internalType": "string",
+        "name": "_name",
+        "type": "string"
+      },
+      {
+        "internalType": "enum SecurexPrivateV2.Role",
+        "name": "_role",
+        "type": "uint8"
       }
     ],
     "name": "addMember",
@@ -27,7 +37,7 @@ export const abi = [
         "type": "string"
       },
       {
-        "indexed": false,
+        "indexed": true,
         "internalType": "uint256",
         "name": "caseId",
         "type": "uint256"
@@ -57,7 +67,7 @@ export const abi = [
         "type": "string"
       },
       {
-        "indexed": false,
+        "indexed": true,
         "internalType": "address",
         "name": "submittedBy",
         "type": "address"
@@ -85,12 +95,54 @@ export const abi = [
     "type": "event"
   },
   {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "_caseId",
+        "type": "uint256"
+      },
+      {
+        "internalType": "string",
+        "name": "_newStatus",
+        "type": "string"
+      }
+    ],
+    "name": "changeCaseStatus",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "_member",
+        "type": "address"
+      },
+      {
+        "internalType": "enum SecurexPrivateV2.Role",
+        "name": "_newRole",
+        "type": "uint8"
+      }
+    ],
+    "name": "changeRole",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
     "anonymous": false,
     "inputs": [
       {
-        "indexed": false,
+        "indexed": true,
         "internalType": "uint256",
         "name": "caseId",
+        "type": "uint256"
+      },
+      {
+        "indexed": true,
+        "internalType": "uint256",
+        "name": "evidenceIndex",
         "type": "uint256"
       },
       {
@@ -113,12 +165,24 @@ export const abi = [
       },
       {
         "indexed": false,
-        "internalType": "enum SecurexPrivate.EvidenceType",
+        "internalType": "enum SecurexPrivateV2.EvidenceType",
         "name": "evidenceType",
         "type": "uint8"
       },
       {
         "indexed": false,
+        "internalType": "string",
+        "name": "officerName",
+        "type": "string"
+      },
+      {
+        "indexed": false,
+        "internalType": "string",
+        "name": "location",
+        "type": "string"
+      },
+      {
+        "indexed": true,
         "internalType": "address",
         "name": "owner",
         "type": "address"
@@ -137,10 +201,22 @@ export const abi = [
     "anonymous": false,
     "inputs": [
       {
-        "indexed": false,
+        "indexed": true,
         "internalType": "address",
         "name": "member",
         "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "string",
+        "name": "name",
+        "type": "string"
+      },
+      {
+        "indexed": false,
+        "internalType": "enum SecurexPrivateV2.Role",
+        "name": "role",
+        "type": "uint8"
       }
     ],
     "name": "MemberAdded",
@@ -197,6 +273,21 @@ export const abi = [
         "type": "uint256"
       },
       {
+        "internalType": "uint256",
+        "name": "_evidenceId",
+        "type": "uint256"
+      },
+      {
+        "internalType": "string",
+        "name": "_officerName",
+        "type": "string"
+      },
+      {
+        "internalType": "string",
+        "name": "_location",
+        "type": "string"
+      },
+      {
         "internalType": "string",
         "name": "_description",
         "type": "string"
@@ -218,17 +309,42 @@ export const abi = [
     "type": "function"
   },
   {
+    "anonymous": false,
     "inputs": [
       {
-        "internalType": "address payable",
-        "name": "_owner",
+        "indexed": true,
+        "internalType": "address",
+        "name": "member",
         "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "enum SecurexPrivateV2.Role",
+        "name": "newRole",
+        "type": "uint8"
       }
     ],
-    "name": "tipEvidenceOwner",
-    "outputs": [],
-    "stateMutability": "payable",
-    "type": "function"
+    "name": "RoleChanged",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "uint256",
+        "name": "caseId",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "internalType": "string",
+        "name": "newStatus",
+        "type": "string"
+      }
+    ],
+    "name": "StatusChanged",
+    "type": "event"
   },
   {
     "inputs": [],
@@ -333,12 +449,12 @@ export const abi = [
   },
   {
     "inputs": [],
-    "name": "getAdmin",
+    "name": "getAllCaseIds",
     "outputs": [
       {
-        "internalType": "address",
+        "internalType": "uint256[]",
         "name": "",
-        "type": "address"
+        "type": "uint256[]"
       }
     ],
     "stateMutability": "view",
@@ -346,12 +462,22 @@ export const abi = [
   },
   {
     "inputs": [],
-    "name": "getAllCaseIds",
+    "name": "getAllMembers",
     "outputs": [
       {
-        "internalType": "uint256[]",
+        "internalType": "address[]",
         "name": "",
-        "type": "uint256[]"
+        "type": "address[]"
+      },
+      {
+        "internalType": "enum SecurexPrivateV2.Role[]",
+        "name": "",
+        "type": "uint8[]"
+      },
+      {
+        "internalType": "string[]",
+        "name": "",
+        "type": "string[]"
       }
     ],
     "stateMutability": "view",
@@ -430,34 +556,87 @@ export const abi = [
       },
       {
         "internalType": "uint256",
-        "name": "_evidenceId",
+        "name": "_evidenceIndex",
         "type": "uint256"
       }
     ],
-    "name": "getEvidenceById",
+    "name": "getEvidenceByIndex",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "evidenceId",
+        "type": "uint256"
+      },
+      {
+        "internalType": "string",
+        "name": "officerName",
+        "type": "string"
+      },
+      {
+        "internalType": "string",
+        "name": "location",
+        "type": "string"
+      },
+      {
+        "internalType": "string",
+        "name": "description",
+        "type": "string"
+      },
+      {
+        "internalType": "string",
+        "name": "fileHash",
+        "type": "string"
+      },
+      {
+        "internalType": "enum SecurexPrivateV2.EvidenceType",
+        "name": "evidenceType",
+        "type": "uint8"
+      },
+      {
+        "internalType": "address",
+        "name": "owner",
+        "type": "address"
+      },
+      {
+        "internalType": "uint256",
+        "name": "timestamp",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "_address",
+        "type": "address"
+      }
+    ],
+    "name": "getName",
     "outputs": [
       {
         "internalType": "string",
         "name": "",
         "type": "string"
-      },
-      {
-        "internalType": "string",
-        "name": "",
-        "type": "string"
-      },
-      {
-        "internalType": "uint256",
-        "name": "",
-        "type": "uint256"
-      },
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
       {
         "internalType": "address",
-        "name": "",
+        "name": "_address",
         "type": "address"
-      },
+      }
+    ],
+    "name": "getRole",
+    "outputs": [
       {
-        "internalType": "enum SecurexPrivate.EvidenceType",
+        "internalType": "enum SecurexPrivateV2.Role",
         "name": "",
         "type": "uint8"
       }
@@ -468,17 +647,36 @@ export const abi = [
   {
     "inputs": [
       {
-        "internalType": "address",
-        "name": "_user",
-        "type": "address"
+        "internalType": "uint256",
+        "name": "_caseId",
+        "type": "uint256"
       }
     ],
-    "name": "getUserCases",
+    "name": "getTotalEvidences",
     "outputs": [
       {
-        "internalType": "uint256[]",
+        "internalType": "uint256",
         "name": "",
-        "type": "uint256[]"
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "name": "members",
+    "outputs": [
+      {
+        "internalType": "address",
+        "name": "",
+        "type": "address"
       }
     ],
     "stateMutability": "view",
@@ -492,12 +690,31 @@ export const abi = [
         "type": "address"
       }
     ],
-    "name": "members",
+    "name": "names",
     "outputs": [
       {
-        "internalType": "bool",
+        "internalType": "string",
         "name": "",
-        "type": "bool"
+        "type": "string"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "name": "roles",
+    "outputs": [
+      {
+        "internalType": "enum SecurexPrivateV2.Role",
+        "name": "",
+        "type": "uint8"
       }
     ],
     "stateMutability": "view",
@@ -506,30 +723,6 @@ export const abi = [
   {
     "inputs": [],
     "name": "totalCases",
-    "outputs": [
-      {
-        "internalType": "uint256",
-        "name": "",
-        "type": "uint256"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "address",
-        "name": "",
-        "type": "address"
-      },
-      {
-        "internalType": "uint256",
-        "name": "",
-        "type": "uint256"
-      }
-    ],
-    "name": "userCases",
     "outputs": [
       {
         "internalType": "uint256",

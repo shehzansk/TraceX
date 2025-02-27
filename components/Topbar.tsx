@@ -41,7 +41,7 @@ const TopBar = () => {
                 <a href="/" style={linkStyle}>Home</a>
                 <a href="/admin" style={linkStyle}>Admin</a>
                 <a href="/about" style={linkStyle}>About</a>
-                <a href="/services" style={linkStyle}>Services</a>
+                <a href="/cases" style={linkStyle}>Case-List</a>
             </nav>
 
             {/* RIGHT SECTION */}

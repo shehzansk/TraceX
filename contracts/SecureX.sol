@@ -1,16 +1,29 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-contract SecurexPrivate {
+contract SecurexPrivateV2 {
     // Admin address
     address public admin;
 
-    // Membership mapping. Only members may register cases and evidences.
-    mapping(address => bool) public members;
+    // Roles
+    enum Role {
+        None,
+        Admin,
+        Collector,
+        Analyst
+    }
+
+    // Mapping from address to role
+    mapping(address => Role) public roles;
+
+    // Mapping from address to name
+    mapping(address => string) public names;
+
+    // List of all member addresses
+    address[] public members;
 
     // --- Structures and Enums ---
 
-    // Evidence types available
     enum EvidenceType {
         Forensic,
         ComputerBased,
@@ -23,10 +36,14 @@ contract SecurexPrivate {
     }
 
     struct Evidence {
+        uint256 evidenceIndex; // Index of the evidence in the case
+        uint256 evidenceId; // 6-digit number provided by user
+        string officerName;
+        string location;
         string description;
         string fileHash;
-        EvidenceType evidenceType; // New field
-        address owner; // Who submitted the evidence (user id)
+        EvidenceType evidenceType;
+        address owner;
         uint256 timestamp;
     }
 
@@ -39,8 +56,8 @@ contract SecurexPrivate {
         string respondent;
         string startDateTime;
         string status;
-        address submittedBy; // Who registered the case
-        mapping(uint256 => Evidence) evidences;
+        address submittedBy;
+        mapping(uint256 => Evidence) evidences; // Mapping of evidenceIndex to Evidence
         uint256 totalEvidences;
         bool initialised;
     }
@@ -49,47 +66,64 @@ contract SecurexPrivate {
     mapping(uint256 => Case) public cases;
     uint256[] public caseIds;
 
-    // Mapping to track which cases an account registered
-    mapping(address => uint256[]) public userCases;
-
     uint256 public totalCases;
 
     // --- Events ---
 
-    event MemberAdded(address member);
+    event MemberAdded(address indexed member, string name, Role role);
+    event RoleChanged(address indexed member, Role newRole);
     event CaseRegistered(
         string courtId,
-        uint256 caseId,
+        uint256 indexed caseId,
         string caseDescription,
         string caseType,
         string petitioner,
         string respondent,
-        address submittedBy,
+        address indexed submittedBy,
         uint256 totalEvidences,
         string startDateTime,
         string status
     );
     event EvidenceRegistered(
-        uint256 caseId,
+        uint256 indexed caseId,
+        uint256 indexed evidenceIndex,
         uint256 evidenceId,
         string description,
         string fileHash,
         EvidenceType evidenceType,
-        address owner,
+        string officerName,
+        string location,
+        address indexed owner,
         uint256 timestamp
     );
+    event StatusChanged(uint256 indexed caseId, string newStatus);
 
     // --- Modifiers ---
 
     modifier onlyAdmin() {
-        require(msg.sender == admin, "Only admin can perform this action");
+        require(
+            roles[msg.sender] == Role.Admin,
+            "Only admin can perform this action"
+        );
         _;
     }
 
-    modifier onlyMember() {
+    modifier onlyCollector() {
         require(
-            members[msg.sender],
-            "Only approved members can perform this action"
+            roles[msg.sender] == Role.Collector ||
+                roles[msg.sender] == Role.Admin,
+            "Only collectors and admin can perform this action"
+        );
+        _;
+    }
+
+    modifier atLeastAnalyst() {
+        Role userRole = roles[msg.sender];
+        require(
+            userRole == Role.Admin ||
+                userRole == Role.Collector ||
+                userRole == Role.Analyst,
+            "Not authorized"
         );
         _;
     }
@@ -98,30 +132,70 @@ contract SecurexPrivate {
 
     constructor() {
         admin = msg.sender;
-        members[msg.sender] = true; // Admin is automatically a member.
+        roles[msg.sender] = Role.Admin; // Deployer is the admin
+        members.push(msg.sender);
+        names[msg.sender] = "Admin";
     }
 
     // --- Admin Functions ---
 
-    /// @notice Admit a new member (only callable by admin).
-    function addMember(address _member) external onlyAdmin {
+    /// @notice Add a new member with a role and name
+    function addMember(
+        address _member,
+        string calldata _name,
+        Role _role
+    ) external onlyAdmin {
         require(_member != address(0), "Invalid address");
-        members[_member] = true;
-        emit MemberAdded(_member);
+        require(_role != Role.None, "Invalid role");
+        require(bytes(_name).length > 0, "Name required");
+        require(roles[_member] == Role.None, "Member already exists");
+
+        roles[_member] = _role;
+        names[_member] = _name;
+        members.push(_member);
+
+        emit MemberAdded(_member, _name, _role);
+    }
+
+    /// @notice Change the role of an existing member
+    function changeRole(address _member, Role _newRole) external onlyAdmin {
+        require(roles[_member] != Role.None, "Member does not exist");
+        roles[_member] = _newRole;
+
+        emit RoleChanged(_member, _newRole);
+    }
+
+    /// @notice Get list of all members
+    function getAllMembers()
+        external
+        view
+        onlyAdmin
+        returns (address[] memory, Role[] memory, string[] memory)
+    {
+        uint256 memberCount = members.length;
+        Role[] memory rolesList = new Role[](memberCount);
+        string[] memory namesList = new string[](memberCount);
+
+        for (uint256 i = 0; i < memberCount; i++) {
+            rolesList[i] = roles[members[i]];
+            namesList[i] = names[members[i]];
+        }
+
+        return (members, rolesList, namesList);
     }
 
     // --- Case Functions ---
 
-    /// @notice Register a new case (only callable by approved members)
+    /// @notice Register a new case
     function registerCase(
-        string memory _courtId,
-        string memory _caseDescription,
-        string memory _caseType,
-        string memory _petitioner,
-        string memory _respondent,
-        string memory _startDateTime,
-        string memory _status
-    ) external onlyMember {
+        string calldata _courtId,
+        string calldata _caseDescription,
+        string calldata _caseType,
+        string calldata _petitioner,
+        string calldata _respondent,
+        string calldata _startDateTime,
+        string calldata _status
+    ) external onlyCollector {
         require(bytes(_courtId).length > 0, "Court ID required");
         require(
             bytes(_caseDescription).length > 0,
@@ -134,9 +208,11 @@ contract SecurexPrivate {
         require(bytes(_status).length > 0, "Status required");
 
         totalCases++;
-        Case storage newCase = cases[totalCases];
+        uint256 caseId = totalCases;
+
+        Case storage newCase = cases[caseId];
         newCase.courtId = _courtId;
-        newCase.caseId = totalCases;
+        newCase.caseId = caseId;
         newCase.caseDescription = _caseDescription;
         newCase.caseType = _caseType;
         newCase.petitioner = _petitioner;
@@ -147,12 +223,11 @@ contract SecurexPrivate {
         newCase.totalEvidences = 0;
         newCase.initialised = true;
 
-        caseIds.push(totalCases);
-        userCases[msg.sender].push(totalCases);
+        caseIds.push(caseId);
 
         emit CaseRegistered(
             _courtId,
-            totalCases,
+            caseId,
             _caseDescription,
             _caseType,
             _petitioner,
@@ -164,32 +239,55 @@ contract SecurexPrivate {
         );
     }
 
+    /// @notice Change case status
+    function changeCaseStatus(
+        uint256 _caseId,
+        string calldata _newStatus
+    ) external onlyCollector {
+        require(cases[_caseId].initialised, "Case does not exist");
+
+        cases[_caseId].status = _newStatus;
+
+        emit StatusChanged(_caseId, _newStatus);
+    }
+
     // --- Evidence Functions ---
 
-    /// @notice Register new evidence for a given case.
-    /// @param _caseId ID of the case
-    /// @param _description Description of the evidence.
-    /// @param _fileHash IPFS hash or similar file reference.
-    /// @param _evidenceType Numeric value corresponding to the EvidenceType enum.
+    /// @notice Register new evidence for a given case
     function registerEvidence(
         uint256 _caseId,
-        string memory _description,
-        string memory _fileHash,
+        uint256 _evidenceId,
+        string calldata _officerName,
+        string calldata _location,
+        string calldata _description,
+        string calldata _fileHash,
         uint8 _evidenceType
-    ) external onlyMember {
-        require(_caseId > 0 && _caseId <= totalCases, "Invalid case ID");
-        require(cases[_caseId].initialised, "Case not initialised");
+    ) external onlyCollector {
+        require(cases[_caseId].initialised, "Case does not exist");
         require(
-            bytes(_description).length > 0,
-            "Evidence description required"
+            _evidenceId >= 100000 && _evidenceId <= 999999,
+            "Evidence ID must be 6 digits"
         );
+        require(bytes(_officerName).length > 0, "Officer name required");
+        require(bytes(_location).length > 0, "Location required");
+        require(bytes(_description).length > 0, "Description required");
         require(bytes(_fileHash).length > 0, "File hash required");
-        require(_evidenceType < 8, "Invalid evidence type");
+        require(
+            _evidenceType <= uint8(EvidenceType.FinancialTransactional),
+            "Invalid evidence type"
+        );
 
         Case storage currentCase = cases[_caseId];
+
         currentCase.totalEvidences++;
-        uint256 evidenceId = currentCase.totalEvidences;
-        currentCase.evidences[evidenceId] = Evidence({
+        uint256 evidenceIndex = currentCase.totalEvidences;
+
+        // Store evidence
+        currentCase.evidences[evidenceIndex] = Evidence({
+            evidenceIndex: evidenceIndex,
+            evidenceId: _evidenceId,
+            officerName: _officerName,
+            location: _location,
             description: _description,
             fileHash: _fileHash,
             evidenceType: EvidenceType(_evidenceType),
@@ -199,10 +297,13 @@ contract SecurexPrivate {
 
         emit EvidenceRegistered(
             _caseId,
-            evidenceId,
+            evidenceIndex,
+            _evidenceId,
             _description,
             _fileHash,
             EvidenceType(_evidenceType),
+            _officerName,
+            _location,
             msg.sender,
             block.timestamp
         );
@@ -210,22 +311,33 @@ contract SecurexPrivate {
 
     // --- View Functions ---
 
-    /// @notice Retrieve the admin address.
-    function getAdmin() public view returns (address) {
-        return admin;
+    /// @notice Retrieve the role of an address
+    function getRole(address _address) external view returns (Role) {
+        return roles[_address];
     }
 
-    /// @notice Retrieve all registered case IDs.
-    function getAllCaseIds() external view returns (uint256[] memory) {
+    /// @notice Retrieve the name of an address
+    function getName(address _address) external view returns (string memory) {
+        return names[_address];
+    }
+
+    /// @notice Retrieve all registered case IDs
+    function getAllCaseIds()
+        external
+        view
+        atLeastAnalyst
+        returns (uint256[] memory)
+    {
         return caseIds;
     }
 
-    /// @notice Retrieve a case’s primary information.
+    /// @notice Retrieve a case’s primary information
     function getCaseById(
         uint256 _caseId
     )
         external
         view
+        atLeastAnalyst
         returns (
             string memory,
             uint256,
@@ -255,36 +367,51 @@ contract SecurexPrivate {
         );
     }
 
-    /// @notice Retrieve a specific evidence from a case.
-    function getEvidenceById(
+    /// @notice Retrieve specific evidence by case ID and evidence index
+    function getEvidenceByIndex(
         uint256 _caseId,
-        uint256 _evidenceId
+        uint256 _evidenceIndex
     )
         external
         view
-        returns (string memory, string memory, uint256, address, EvidenceType)
+        atLeastAnalyst
+        returns (
+            uint256 evidenceId,
+            string memory officerName,
+            string memory location,
+            string memory description,
+            string memory fileHash,
+            EvidenceType evidenceType,
+            address owner,
+            uint256 timestamp
+        )
     {
         require(cases[_caseId].initialised, "Case does not exist");
-        Evidence storage evd = cases[_caseId].evidences[_evidenceId];
+        require(
+            _evidenceIndex > 0 &&
+                _evidenceIndex <= cases[_caseId].totalEvidences,
+            "Invalid evidence index"
+        );
+
+        Evidence storage evd = cases[_caseId].evidences[_evidenceIndex];
+
         return (
+            evd.evidenceId,
+            evd.officerName,
+            evd.location,
             evd.description,
             evd.fileHash,
-            evd.timestamp,
+            evd.evidenceType,
             evd.owner,
-            evd.evidenceType
+            evd.timestamp
         );
     }
 
-    /// @notice Retrieve all case IDs registered by a specific user.
-    function getUserCases(
-        address _user
-    ) external view returns (uint256[] memory) {
-        return userCases[_user];
-    }
-
-    /// @notice Function to tip the evidence owner.
-    function tipEvidenceOwner(address payable _owner) external payable {
-        require(msg.value > 0, "Tip must be greater than 0");
-        _owner.transfer(msg.value);
+    /// @notice Retrieve total number of evidences in a case
+    function getTotalEvidences(
+        uint256 _caseId
+    ) external view atLeastAnalyst returns (uint256) {
+        require(cases[_caseId].initialised, "Case does not exist");
+        return cases[_caseId].totalEvidences;
     }
 }

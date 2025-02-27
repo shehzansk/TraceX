@@ -1,5 +1,7 @@
+// app/register-cases/page.tsx
+
 "use client";
-import { useRef, useState } from "react";
+import { useRef, useState, useEffect } from "react";
 import {
   Box,
   Button,
@@ -10,8 +12,11 @@ import {
   Heading,
   useToast,
   Select,
+  Alert,
+  AlertIcon,
+  Spinner,
 } from "@chakra-ui/react";
-import { addCase } from "@/utils/helpers";
+import { addCase, isCollectorOrAdmin } from "@/utils/helpers";
 
 export default function RegisterCase() {
   const courtIdRef = useRef<HTMLInputElement>(null);
@@ -22,11 +27,32 @@ export default function RegisterCase() {
   const startDateRef = useRef<HTMLInputElement>(null);
   const statusRef = useRef<HTMLSelectElement>(null);
 
-  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
+  const [hasAccess, setHasAccess] = useState<boolean>(false);
+  const [error, setError] = useState<string>("");
   const toast = useToast();
 
+  useEffect(() => {
+    const checkAccess = async () => {
+      try {
+        const access = await isCollectorOrAdmin();
+        setHasAccess(access);
+        setIsLoading(false);
+        if (!access) {
+          setError("You do not have permission to register a case.");
+        }
+      } catch (err: any) {
+        console.error(err);
+        setError(err.message || "An unknown error occurred.");
+        setIsLoading(false);
+      }
+    };
+    checkAccess();
+  }, []);
+
   const handleAddCase = async () => {
-    setIsLoading(true);
+    setIsSubmitting(true);
 
     try {
       if (
@@ -41,10 +67,10 @@ export default function RegisterCase() {
         toast({
           title: "All fields are required.",
           status: "error",
-          duration: 3000,
+          duration: 5000,
           isClosable: true,
         });
-        setIsLoading(false);
+        setIsSubmitting(false);
         return;
       }
 
@@ -62,7 +88,7 @@ export default function RegisterCase() {
         toast({
           title: `Case registered successfully with Case ID: ${response.newCaseId}`,
           status: "success",
-          duration: 3000,
+          duration: 5000,
           isClosable: true,
         });
         // Reset form fields
@@ -71,12 +97,14 @@ export default function RegisterCase() {
         petitionerRef.current.value = "";
         respondentRef.current.value = "";
         startDateRef.current.value = "";
+        statusRef.current.value = "";
+        caseTypeRef.current.value = "";
       } else {
         toast({
           title: "Failed to register case.",
-          description: "You are not permitted to register cases, contact the Admin.",
+          description: response.error || "An unknown error occurred.",
           status: "error",
-          duration: 3000,
+          duration: 5000,
           isClosable: true,
         });
       }
@@ -86,13 +114,32 @@ export default function RegisterCase() {
         title: "Error",
         description: err.message || "An unknown error occurred.",
         status: "error",
-        duration: 3000,
+        duration: 5000,
         isClosable: true,
       });
     } finally {
-      setIsLoading(false);
+      setIsSubmitting(false);
     }
   };
+
+  if (isLoading) {
+    return (
+      <Box className="min-h-screen flex justify-center items-center">
+        <Spinner size="xl" />
+      </Box>
+    );
+  }
+
+  if (!hasAccess) {
+    return (
+      <Box className="min-h-screen flex justify-center items-center">
+        <Alert status="error">
+          <AlertIcon />
+          {error || "You do not have permission to view this page."}
+        </Alert>
+      </Box>
+    );
+  }
 
   return (
     <Box className="min-h-screen flex justify-center items-center p-6">
@@ -107,7 +154,10 @@ export default function RegisterCase() {
 
         <FormControl id="caseDescription" mb={4} isRequired>
           <FormLabel>Case Description</FormLabel>
-          <Textarea placeholder="Enter case description" ref={caseDescriptionRef} />
+          <Textarea
+            placeholder="Enter case description"
+            ref={caseDescriptionRef}
+          />
         </FormControl>
 
         <FormControl id="caseType" mb={4} isRequired>
@@ -138,8 +188,8 @@ export default function RegisterCase() {
         <FormControl id="status" mb={6} isRequired>
           <FormLabel>Status</FormLabel>
           <Select placeholder="Select status" ref={statusRef}>
-            <option value="Pending">Pending</option>
-            <option value="Ongoing">Ongoing</option>
+            <option value="Open">Open</option>
+            <option value="Under Investigation">Under Investigation</option>
             <option value="Closed">Closed</option>
             {/* Add more options as needed */}
           </Select>
@@ -147,7 +197,7 @@ export default function RegisterCase() {
 
         <Button
           colorScheme="teal"
-          isLoading={isLoading}
+          isLoading={isSubmitting}
           onClick={handleAddCase}
           width="full"
         >
