@@ -193,29 +193,29 @@ export default function SubmitEvidence() {
   }
 
   return (
-    <Box className="min-h-screen flex justify-center items-center p-6">
-      <Box maxW="600px" w="100%">
+    <Box className="min-h-screen flex justify-center items-center pt-10 p-6">
+      <Box maxW="700px" w="100%">
         <Heading as="h1" size="lg" mb={6}>
           Submit Evidence
         </Heading>
         <FormControl id="caseId" mb={4} isRequired>
           <FormLabel>Case ID</FormLabel>
-          <Input placeholder="Enter case ID" ref={caseIdRef} />
+          <Input placeholder="Enter case ID" ref={caseIdRef} className="mb-4 w-full px-4 py-2 shadow-md rounded transition duration-200 ease-in-out hover:shadow-lg" />
         </FormControl>
 
         <FormControl id="evidenceId" mb={4} isRequired>
           <FormLabel>Evidence ID (6-digit number)</FormLabel>
-          <Input placeholder="Enter evidence ID" ref={evidenceIdRef} />
+          <Input placeholder="Enter evidence ID" ref={evidenceIdRef} className="mb-4 w-full px-4 py-2 shadow-md rounded transition duration-200 ease-in-out hover:shadow-lg" />
         </FormControl>
 
         <FormControl id="officerName" mb={4} isRequired>
           <FormLabel>Officer Name</FormLabel>
-          <Input placeholder="Enter officer name" ref={officerNameRef} />
+          <Input placeholder="Enter officer name" ref={officerNameRef} className="mb-4 w-full px-4 py-2 shadow-md rounded transition duration-200 ease-in-out hover:shadow-lg" />
         </FormControl>
 
         <FormControl id="location" mb={4} isRequired>
           <FormLabel>Location</FormLabel>
-          <Input placeholder="Enter location" ref={locationRef} />
+          <Input placeholder="Enter location" ref={locationRef} className="mb-4 w-full px-4 py-2 shadow-md rounded transition duration-200 ease-in-out hover:shadow-lg" />
         </FormControl>
 
         <FormControl id="evidenceType" mb={4} isRequired>
@@ -241,6 +241,7 @@ export default function SubmitEvidence() {
           <Textarea
             placeholder="Enter evidence description"
             ref={evidenceDescriptionRef}
+            className="mb-4 w-full px-4 py-2 shadow-md rounded transition duration-200 ease-in-out hover:shadow-lg"
           />
         </FormControl>
 
@@ -252,6 +253,7 @@ export default function SubmitEvidence() {
             onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
               setFile(e.target.files ? Array.from(e.target.files) : [])
             }
+
           />
         </FormControl>
 

@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 
 const Header = () => {
-    const [currentTime, setCurrentTime] = useState < Date | null > (null);
+    const [currentTime, setCurrentTime] = useState<Date | null>(null);
 
     useEffect(() => {
         // Set the initial time after mounting
@@ -58,10 +58,10 @@ const Header = () => {
             {/* Right Side - Navigation and controls */}
             <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
                 <a
-                    href="#main-content"
+                    href="/"
                     style={{ color: "white", textDecoration: "none" }}
                 >
-                    Skip to Main Content
+                    ⛓️TraceX
                 </a>
                 <span style={{ color: "white" }}>|</span>
                 <div>
@@ -80,9 +80,9 @@ const Header = () => {
                     }}
                 >
                     <option value="en">English</option>
-                    <option value="mr">Marathi</option>
+                    <option value="mr">Kannada</option>
                     <option value="tm">Tamil</option>
-                    <option value="ben">Bengali</option>
+                    <option value="ben">Marathi</option>
                 </select>
             </div>
         </div>

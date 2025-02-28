@@ -496,12 +496,12 @@ Instructions:
     }
 
     return (
-        <Box className="min-h-screen p-6 max-w-6xl mx-auto">
+        <Box className="min-h-screen pt-12 p-8 max-w-7xl mx-auto">
             <Heading as="h1" size="lg" mb={6}>
                 Case Details (ID: {caseId})
             </Heading>
             <Box display="flex" flexDirection={["column", "column", "row"]} gap={6}>
-                <Box flex="1">
+                <Box flex="1" className='pr-4'>
                     {caseDetails && (
                         <>
                             <Text>
@@ -560,6 +560,7 @@ Instructions:
                     value={searchQuery}
                     onChange={handleSearch}
                     mb={4}
+                    className="mb-4 w-full px-4 py-2 shadow-md rounded transition duration-200 ease-in-out hover:shadow-lg hover:border-blue-500"
                 />
                 {filteredEvidences.length > 0 ? (
                     <VStack spacing={4} align="stretch">

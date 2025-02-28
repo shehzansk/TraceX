@@ -189,7 +189,7 @@ export default function CasesList() {
     }
 
     return (
-        <Box className="min-h-screen p-6 max-w-6xl mx-auto">
+        <Box className="min-h-screen p-7 max-w-7xl mx-auto">
             <Heading as="h1" size="lg" mb={6}>
                 Registered Cases
             </Heading>
@@ -197,8 +197,9 @@ export default function CasesList() {
                 placeholder="Search cases by description..."
                 value={searchQuery}
                 onChange={handleSearch}
-                mb={4}
+                className="mb-4 w-full px-4 py-2 shadow-md rounded transition duration-200 ease-in-out hover:shadow-lg hover:border-blue-500"
             />
+
             <Table variant="simple">
                 <Thead>
                     <Tr>

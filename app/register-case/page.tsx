@@ -142,14 +142,14 @@ export default function RegisterCase() {
   }
 
   return (
-    <Box className="min-h-screen flex justify-center items-center p-6">
-      <Box maxW="600px" w="100%">
+    <Box className="min-h-screen flex justify-center items-center pt-10 p-6">
+      <Box maxW="700px" w="100%">
         <Heading as="h1" size="lg" mb={6}>
-          Register Case
+          Register Cases
         </Heading>
         <FormControl id="courtId" mb={4} isRequired>
           <FormLabel>Court ID</FormLabel>
-          <Input placeholder="Enter court ID" ref={courtIdRef} />
+          <Input placeholder="Enter court ID" ref={courtIdRef} className="mb-4 w-full px-4 py-2 shadow-md rounded transition duration-200 ease-in-out hover:shadow-lg" />
         </FormControl>
 
         <FormControl id="caseDescription" mb={4} isRequired>
@@ -157,6 +157,7 @@ export default function RegisterCase() {
           <Textarea
             placeholder="Enter case description"
             ref={caseDescriptionRef}
+            className="mb-4 w-full px-4 py-2 shadow-md rounded transition duration-200 ease-in-out hover:shadow-lg"
           />
         </FormControl>
 
@@ -172,17 +173,17 @@ export default function RegisterCase() {
 
         <FormControl id="petitioner" mb={4} isRequired>
           <FormLabel>Petitioner</FormLabel>
-          <Input placeholder="Enter petitioner name" ref={petitionerRef} />
+          <Input placeholder="Enter petitioner name" ref={petitionerRef} className="mb-4 w-full px-4 py-2 shadow-md rounded transition duration-200 ease-in-out hover:shadow-lg" />
         </FormControl>
 
         <FormControl id="respondent" mb={4} isRequired>
           <FormLabel>Respondent</FormLabel>
-          <Input placeholder="Enter respondent name" ref={respondentRef} />
+          <Input placeholder="Enter respondent name" ref={respondentRef} className="mb-4 w-full px-4 py-2 shadow-md rounded transition duration-200 ease-in-out hover:shadow-lg" />
         </FormControl>
 
         <FormControl id="startDateTime" mb={4} isRequired>
           <FormLabel>Start Date</FormLabel>
-          <Input type="date" ref={startDateRef} />
+          <Input type="date" ref={startDateRef} className="mb-4 w-full px-4 py-2 shadow-md rounded transition duration-200 ease-in-out hover:shadow-lg" />
         </FormControl>
 
         <FormControl id="status" mb={6} isRequired>
