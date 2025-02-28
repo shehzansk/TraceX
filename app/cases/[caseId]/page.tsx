@@ -273,7 +273,7 @@ Instructions:
             apiKey: process.env.NEXT_PUBLIC_GOOGLE_API_KEY,
         });
         const response = await llm.invoke([{ role: "user", content: prompt }]);
-        const aiReportContent = response.content?.trim();
+        const aiReportContent = response.content;
         if (!aiReportContent) {
             throw new Error("Failed to generate AI report.");
         }
