@@ -1,4 +1,3 @@
-// TopBar.tsx
 import React, { useState } from 'react';
 import { ConnectButton } from '@rainbow-me/rainbowkit';
 import Image from 'next/image';
