@@ -1,7 +1,6 @@
 "use client";
 import "@/styles/globals.css";
 import { siteConfig } from "@/config/site";
-import { fontSans } from "@/config/fonts";
 import { Providers } from "./providers";
 import Header from "@/components/header";
 import TopBar from "@/components/Topbar";
@@ -52,8 +51,7 @@ export default function RootLayout({
 
       <body
         className={clsx(
-          "min-h-screen bg-white text-black font-sans antialiased",
-          fontSans.variable
+          "min-h-screen bg-white text-black antialiased",
         )}
         style={{ backgroundColor: "white" }}
       >
