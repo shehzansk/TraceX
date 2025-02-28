@@ -3,8 +3,8 @@ import "@/styles/globals.css";
 import { siteConfig } from "@/config/site";
 import { fontSans } from "@/config/fonts";
 import { Providers } from "./providers";
-import Header from "@/components/Header";
-import TopBar from "@/components/TopBar";
+import Header from "@/components/header";
+import TopBar from "@/components/Topbar";
 import clsx from "clsx";
 
 import "@rainbow-me/rainbowkit/styles.css";
