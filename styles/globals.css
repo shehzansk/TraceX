@@ -1,7 +1,12 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@200;600&display=swap');
+
+.font-cinzel {
+    font-family: 'Cinzel', serif;
+}
 
 .upload-evidence input {
-  padding-top: 8px;
+    padding-top: 8px;
 }
