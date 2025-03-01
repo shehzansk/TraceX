@@ -86,11 +86,11 @@ export default function FeatureBoxes() {
     ];
 
     return (
-        <div className="flex flex-wrap justify-between gap-8 p-8 bg-[rgb(23,0,108)]">
+        <div className="flex flex-wrap justify-between gap-8 p-8 py-10 bg-[rgb(23,0,108)]">
             {boxes.map((box, index) => (
                 <div
                     key={index}
-                    className="bg-white border border-gray-200 p-6 rounded-lg shadow-lg flex flex-col items-start justify-between w-full md:w-[30%] min-w-[280px] overflow-hidden relative transform transition-transform duration-300 hover:-translate-x-1"
+                    className="bg-white border border-gray-200 p-6 py-8 rounded-lg shadow-lg flex flex-col items-start justify-between w-full md:w-[30%] min-w-[280px] overflow-hidden relative transform transition-transform duration-300 hover:-translate-x-1"
                 >
                     {/* Info Button */}
                     <div className="absolute top-4 right-4">

@@ -1,13 +1,21 @@
-import React, { useState } from 'react';
-import { ConnectButton } from '@rainbow-me/rainbowkit';
+"use client";
+
+import React, { useState, memo } from 'react';
+import dynamic from 'next/dynamic';
 import Image from 'next/image';
 import { Menu, X } from 'lucide-react';
+
+const ConnectButton = dynamic(
+    () =>
+        import('@rainbow-me/rainbowkit').then((mod) => mod.ConnectButton),
+    { ssr: false }
+);
 
 const TopBar = () => {
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
     const linkStyle =
-        "text-decoration-none text-xl hover:text-red-500 transition-colors duration-300 px-3 pb-1 relative font-cinzel";
+        "text-decoration-none text-[1.15rem] hover:text-red-500 transition-colors duration-300 px-4 pb-1 relative font-cinzel";
 
     return (
         <div className="relative bg-gray-100 shadow-md">
@@ -56,18 +64,30 @@ const TopBar = () => {
                 <div className="flex items-center">
                     <Image src="/gov.png" alt="CCITR Logo" width={240} height={180} />
                 </div>
+
                 {/* Navigation Links */}
-                <nav className="flex space-x-8 h-full">
-                    <a href="/" className={linkStyle}>Home</a>
-                    <a href="/admin" className={linkStyle}>Admin</a>
-                    <a href="/about" className={linkStyle}>About</a>
-                    <a href="/cases" className={linkStyle}>Case-List</a>
+                <nav className="flex items-end h-full">
+                    {/* First Link */}
+                    <div className="flex items-end">
+                        <a href="/" className={linkStyle}>Home</a>
+                    </div>
+
+                    {/* Separator and Other Links */}
+                    {[{ href: "/admin", label: "Admin" }, { href: "/about", label: "About" }, { href: "/cases", label: "Case-List" }].map((link, index) => (
+                        <div key={index} className="flex items-end">
+                            {/* Separator */}
+                            <span className="hidden md:inline-block text-gray-500 px-4 pb-1 self-center">|</span>
+                            {/* Link */}
+                            <a href={link.href} className={linkStyle}>{link.label}</a>
+                        </div>
+                    ))}
                 </nav>
+
                 {/* Right Section */}
                 <div className="flex items-center">
                     <Image src="/ccitr.jpg" alt="CID Karnataka Logo" width={80} height={80} />
                     <div className="ml-4">
-                        <ConnectButton />
+                        <ConnectButton /> {/* Now dynamically imported */}
                     </div>
                 </div>
             </div>
@@ -75,4 +95,4 @@ const TopBar = () => {
     );
 };
 
-export default TopBar;
+export default memo(TopBar);

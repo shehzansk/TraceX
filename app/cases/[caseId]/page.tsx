@@ -262,16 +262,16 @@ Start Date: ${data.caseDetails.startDateTime}
 Submitted By: ${data.caseDetails.submittedBy}
 Evidences:
 ${data.evidences
-  .map(
-    (evidence) =>
-      `Evidence ID: ${evidence.evidenceId}
+        .map(
+          (evidence) =>
+            `Evidence ID: ${evidence.evidenceId}
 Description: ${evidence.description}
 Officer Name: ${evidence.officerName}
 Location: ${evidence.location}
 Evidence Type: ${evidence.evidenceType}
 Timestamp: ${new Date(evidence.timestamp * 1000).toLocaleString()}`
-  )
-  .join("\n")}
+        )
+        .join("\n")}
 Instructions:
 - Summarize the case and its significance.
 - Detail each piece of evidence and its relevance.
@@ -501,349 +501,351 @@ Instructions:
     );
   }
 
-return (
-  <Box
-    minH="100vh"
-    pt={["4", "8", "12"]}
-    px={["4", "6", "8"]}
-    maxW="7xl"
-    mx="auto"
-  >
-    <Heading as="h1" size={["lg", "xl"]} mb={[2, 6]}>
-      Case Details (ID: {caseId})
-    </Heading>
+  return (
+    <Box
+      minH="100vh"
+      pt={["4", "8", "12"]}
+      px={["4", "6", "8"]}
+      maxW="7xl"
+      mx="auto"
+    >
+      <Heading as="h1" size={["lg", "xl"]} mb={[2, 6]}>
+        Case Details (ID: {caseId})
+      </Heading>
 
-    <Box display="flex" flexDirection={["column", "column", "row"]} gap={[4, 6]}>
-  <Box flex="1" pr={[0, 0, 4]}>
-    {caseDetails && (
-      <>
-        <Text>
-          <strong>Court ID:</strong> {caseDetails.courtId}
-        </Text>
-        <Text>
-          <strong>Case Description:</strong> {caseDetails.caseDescription}
-        </Text>
-        <Text>
-          <strong>Case Type:</strong> {caseDetails.caseType}
-        </Text>
-        <Text>
-          <strong>Petitioner:</strong> {caseDetails.petitioner}
-        </Text>
-        <Text>
-          <strong>Respondent:</strong> {caseDetails.respondent}
-        </Text>
-        <Text>
-          <strong>Status:</strong> {caseDetails.status}
-        </Text>
-        <Text>
-          <strong>Start Date:</strong>{" "}
-          {new Date(caseDetails.startDateTime).toLocaleDateString()}
-        </Text>
-        <Text>
-          <strong>Submitted By:</strong> {caseDetails.submittedBy}
-        </Text>
-      </>
-    )}
-    <HStack justify="center" spacing={["2", "4"]} mt={4} wrap="wrap">
-      <Button colorScheme="teal" onClick={generateAIReport} size={["sm", "md"]}>
-        Generate AI Audit Report
-      </Button>
-      {canEdit && (
-        <Button colorScheme="teal" onClick={openEvidenceModal} size={["sm", "md"]}>
-          + Add Evidence
-        </Button>
-      )}
-    </HStack>
-  </Box>
+      <Box display="flex" flexDirection={["column", "column", "row"]} gap={[4, 6]}>
+        <Box flex="1" pr={[0, 0, 4]}>
+          {caseDetails && (
+            <>
+              <Text>
+                <strong>Court ID:</strong> {caseDetails.courtId}
+              </Text>
+              <Text>
+                <strong>Case Description:</strong> {caseDetails.caseDescription}
+              </Text>
+              <Text>
+                <strong>Case Type:</strong> {caseDetails.caseType}
+              </Text>
+              <Text>
+                <strong>Petitioner:</strong> {caseDetails.petitioner}
+              </Text>
+              <Text>
+                <strong>Respondent:</strong> {caseDetails.respondent}
+              </Text>
+              <Text>
+                <strong>Status:</strong> {caseDetails.status}
+              </Text>
+              <Text>
+                <strong>Start Date:</strong>{" "}
+                {new Date(caseDetails.startDateTime).toLocaleDateString()}
+              </Text>
+              <Text>
+                <strong>Submitted By:</strong> {caseDetails.submittedBy}
+              </Text>
+            </>
+          )}
+          <HStack justify="center" spacing={["2", "4"]} mt={4} wrap="wrap">
+            <Button colorScheme="teal" onClick={generateAIReport} size={["sm", "md"]}>
+              Generate AI Audit Report
+            </Button>
+            {canEdit && (
+              <Button colorScheme="teal" onClick={openEvidenceModal} size={["sm", "md"]}>
+                + Add Evidence
+              </Button>
+            )}
+          </HStack>
+        </Box>
 
-      <Box
-        flex="1"
-        height={["250px", "350px", "400px"]}
-        maxH={["250px", "350px", "400px"]}
-        overflow="hidden"
-        position="relative"
-      >
-        <Heading as="h2" size={["md", "lg"]} mb={[2, 4]}>
-          Case Timeline
-        </Heading>
-        {bubbleEvents.length > 0 ? (
-          <Chart
-            style={{ height: "100%" }}
-            type="bubble"
-            data={bubbleData}
-            options={{
-              responsive: true,
-              maintainAspectRatio: false,
-              layout: {
-                padding: { top: 10, bottom: 20, left: 10, right: 10 },
-              },
-              scales: {
-                x: {
-                  type: "time",
-                  time: { unit: "day" },
-                  title: { display: true, text: "Date" },
+        <Box
+          flex="1"
+          height={["250px", "350px", "400px"]}
+          maxH={["250px", "350px", "400px"]}
+          overflow="hidden"
+          position="relative"
+        >
+          <Heading as="h2" size={["md", "lg"]} mb={[2, 4]}>
+            Case Timeline
+          </Heading>
+          {bubbleEvents.length > 0 ? (
+            <Chart
+              style={{ height: "100%" }}
+              type="bubble"
+              data={bubbleData}
+              options={{
+                responsive: true,
+                maintainAspectRatio: false,
+                layout: {
+                  padding: { top: 10, bottom: 20, left: 10, right: 10 },
                 },
-                y: { display: false },
-              },
-              plugins: {
-                colors: { forceOverride: true },
-                tooltip: {
-                  callbacks: {
-                    label: function (context) {
-                      const dataPoint = context.raw;
-                      if (dataPoint.type === "caseRegistered") {
+                scales: {
+                  x: {
+                    type: "time",
+                    time: { unit: "day" },
+                    title: { display: true, text: "Date" },
+                  },
+                  y: { display: false },
+                },
+                plugins: {
+                  colors: { forceOverride: true },
+                  tooltip: {
+                    callbacks: {
+                      label: function (context) {
+                        const dataPoint = context.raw;
+                        if (dataPoint.type === "caseRegistered") {
+                          return [
+                            dataPoint.label,
+                            `Date: ${new Date(dataPoint.x).toLocaleString()}`,
+                          ];
+                        }
                         return [
                           dataPoint.label,
+                          `Description: ${dataPoint.description}`,
+                          `Officer: ${dataPoint.officerName}`,
+                          `Location: ${dataPoint.location}`,
                           `Date: ${new Date(dataPoint.x).toLocaleString()}`,
                         ];
-                      }
-                      return [
-                        dataPoint.label,
-                        `Description: ${dataPoint.description}`,
-                        `Officer: ${dataPoint.officerName}`,
-                        `Location: ${dataPoint.location}`,
-                        `Date: ${new Date(dataPoint.x).toLocaleString()}`,
-                      ];
+                      },
                     },
                   },
+                  legend: { display: true },
                 },
-                legend: { display: true },
-              },
-            }}
-          />
+              }}
+            />
+          ) : (
+            <Text>No evidences to display in the timeline.</Text>
+          )}
+        </Box>
+      </Box>
+
+      <Box mt={[4, 8]}>
+        <Heading as="h2" size={["md", "lg"]} mb={[2, 4]}>
+          Evidences
+        </Heading>
+        <Input
+          placeholder="Search evidences by ID or description..."
+          value={searchQuery}
+          onChange={handleSearch}
+          mb={4}
+          px={["2", "4"]}
+          py={["2", "3"]}
+          shadow="md"
+          rounded="md"
+          transition="all 0.2s"
+          _hover={{ shadow: "lg", borderColor: "blue.500" }}
+        />
+        {filteredEvidences.length > 0 ? (
+          <VStack spacing={4} align="stretch">
+            {filteredEvidences.map((evidence, index) => (
+              <Box
+                key={index}
+                p={["2", "4"]}
+                borderWidth="1px"
+                borderRadius="md"
+                borderColor="gray.500"
+                _hover={{ bg: "gray.50" }}
+              >
+                <Text>
+                  <strong>Evidence ID:</strong> {evidence.evidenceId}
+                </Text>
+                <Text>
+                  <strong>Description:</strong> {evidence.description}
+                </Text>
+                <Text>
+                  <strong>Date:</strong>{" "}
+                  {new Date(evidence.timestamp * 1000).toLocaleString()}
+                </Text>
+                <Text>
+                  <strong>Officer Name:</strong> {evidence.officerName}
+                </Text>
+                <Text>
+                  <strong>Location:</strong> {evidence.location}
+                </Text>
+                <Text>
+                  <strong>File Hash URL:</strong>{" "}
+                  <a href={evidence.fileHash} target="_blank" rel="noopener noreferrer">
+                    {evidence.fileHash}
+                  </a>
+                </Text>
+                <Text>
+                  <strong>Submitted By:</strong> {evidence.owner}
+                </Text>
+
+                {/* Updated HStack for centered, responsive buttons */}
+                <HStack
+                  spacing={["2", "4"]}
+                  justify={["center", "flex-end"]}
+                  mt={5}
+                  mb={4}
+                  wrap="wrap"
+                >
+                  <Button
+                    onClick={() => fetchAuditTrail(evidence.evidenceId)}
+                    colorScheme="blue"
+                    size={["sm", "md"]}
+                  >
+                    View Audit Trail
+                  </Button>
+                  <Button
+                    as="a"
+                    href={evidence.fileHash}
+                    download
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    colorScheme="teal"
+                    size={["sm", "md"]}
+                  >
+                    Download Evidence
+                  </Button>
+                </HStack>
+              </Box>
+            ))}
+          </VStack>
+
         ) : (
-          <Text>No evidences to display in the timeline.</Text>
+          <Text>No evidences found.</Text>
         )}
       </Box>
-    </Box>
 
-    <Box mt={[4, 8]}>
-      <Heading as="h2" size={["md", "lg"]} mb={[2, 4]}>
-        Evidences
-      </Heading>
-      <Input
-        placeholder="Search evidences by ID or description..."
-        value={searchQuery}
-        onChange={handleSearch}
-        mb={4}
-        px={["2", "4"]}
-        py={["2", "3"]}
-        shadow="md"
-        rounded="md"
-        transition="all 0.2s"
-        _hover={{ shadow: "lg", borderColor: "blue.500" }}
-      />
-      {filteredEvidences.length > 0 ? (
-        <VStack spacing={4} align="stretch">
-  {filteredEvidences.map((evidence, index) => (
-    <Box
-      key={index}
-      p={["2", "4"]}
-      borderWidth="1px"
-      borderRadius="md"
-      _hover={{ bg: "gray.50" }}
-    >
-      <Text>
-        <strong>Evidence ID:</strong> {evidence.evidenceId}
-      </Text>
-      <Text>
-        <strong>Description:</strong> {evidence.description}
-      </Text>
-      <Text>
-        <strong>Date:</strong>{" "}
-        {new Date(evidence.timestamp * 1000).toLocaleString()}
-      </Text>
-      <Text>
-        <strong>Officer Name:</strong> {evidence.officerName}
-      </Text>
-      <Text>
-        <strong>Location:</strong> {evidence.location}
-      </Text>
-      <Text>
-        <strong>File Hash URL:</strong>{" "}
-        <a href={evidence.fileHash} target="_blank" rel="noopener noreferrer">
-          {evidence.fileHash}
-        </a>
-      </Text>
-      <Text>
-        <strong>Submitted By:</strong> {evidence.owner}
-      </Text>
-
-      {/* Updated HStack for centered, responsive buttons */}
-      <HStack
-        spacing={["2", "4"]}
-        justify="center"
-        mt={5}
-        wrap="wrap"
-      >
-        <Button
-          onClick={() => fetchAuditTrail(evidence.evidenceId)}
-          colorScheme="blue"
-          size={["sm", "md"]}
-        >
-          View Audit Trail
-        </Button>
-        <Button
-          as="a"
-          href={evidence.fileHash}
-          download
-          target="_blank"
-          rel="noopener noreferrer"
-          colorScheme="teal"
-          size={["sm", "md"]}
-        >
-          Download Evidence
-        </Button>
-      </HStack>
-    </Box>
-  ))}
-</VStack>
-
-      ) : (
-        <Text>No evidences found.</Text>
-      )}
-    </Box>
-
-    {/* Evidence Modal */}
-    <Modal isOpen={isEvidenceOpen} onClose={onEvidenceClose} size="xl">
-      <ModalOverlay />
-      <ModalContent>
-        <ModalHeader>Add Evidence</ModalHeader>
-        <ModalCloseButton />
-        <ModalBody>
-          <FormControl id="evidenceId" mb={4} isRequired>
-            <FormLabel>Evidence ID (6-digit number)</FormLabel>
-            <Input placeholder="Enter evidence ID" ref={evidenceIdRef} />
-          </FormControl>
-          <FormControl id="officerName" mb={4} isRequired>
-            <FormLabel>Officer Name</FormLabel>
-            <Input placeholder="Enter officer name" ref={officerNameRef} />
-          </FormControl>
-          <FormControl id="location" mb={4} isRequired>
-            <FormLabel>Location</FormLabel>
-            <Input placeholder="Enter location" ref={locationRef} />
-          </FormControl>
-          <FormControl id="evidenceType" mb={4} isRequired>
-            <FormLabel>Evidence Type</FormLabel>
-            <Select
-              placeholder="Select evidence type"
-              value={evidenceType.toString()}
-              onChange={(e) => setEvidenceType(Number(e.target.value))}
+      {/* Evidence Modal */}
+      <Modal isOpen={isEvidenceOpen} onClose={onEvidenceClose} size="xl">
+        <ModalOverlay />
+        <ModalContent>
+          <ModalHeader>Add Evidence</ModalHeader>
+          <ModalCloseButton />
+          <ModalBody>
+            <FormControl id="evidenceId" mb={4} isRequired>
+              <FormLabel>Evidence ID (6-digit number)</FormLabel>
+              <Input placeholder="Enter evidence ID" ref={evidenceIdRef} />
+            </FormControl>
+            <FormControl id="officerName" mb={4} isRequired>
+              <FormLabel>Officer Name</FormLabel>
+              <Input placeholder="Enter officer name" ref={officerNameRef} />
+            </FormControl>
+            <FormControl id="location" mb={4} isRequired>
+              <FormLabel>Location</FormLabel>
+              <Input placeholder="Enter location" ref={locationRef} />
+            </FormControl>
+            <FormControl id="evidenceType" mb={4} isRequired>
+              <FormLabel>Evidence Type</FormLabel>
+              <Select
+                placeholder="Select evidence type"
+                value={evidenceType.toString()}
+                onChange={(e) => setEvidenceType(Number(e.target.value))}
+              >
+                <option value="0">Forensic Evidence</option>
+                <option value="1">Computer-Based Evidence</option>
+                <option value="2">Network & Internet-Based Evidence</option>
+                <option value="3">Social Media & Communication Evidence</option>
+                <option value="4">Mobile Device Evidence (GPS Data)</option>
+                <option value="5">Cybercrime Evidence</option>
+                <option value="6">Surveillance & IoT Data</option>
+                <option value="7">Financial & Transactional Evidence</option>
+              </Select>
+            </FormControl>
+            <FormControl id="evidenceDescription" mb={4} isRequired>
+              <FormLabel>Evidence Description</FormLabel>
+              <Textarea placeholder="Enter evidence description" ref={evidenceDescriptionRef} />
+            </FormControl>
+            <FormControl id="file" mb={6} isRequired>
+              <FormLabel>Upload Evidence File</FormLabel>
+              <Input
+                type="file"
+                accept=""
+                onChange={(e) =>
+                  setFile(e.target.files ? Array.from(e.target.files) : [])
+                }
+              />
+            </FormControl>
+          </ModalBody>
+          <ModalFooter>
+            <Button
+              colorScheme="teal"
+              isLoading={isSubmittingEvidence}
+              onClick={handleAddEvidence}
             >
-              <option value="0">Forensic Evidence</option>
-              <option value="1">Computer-Based Evidence</option>
-              <option value="2">Network & Internet-Based Evidence</option>
-              <option value="3">Social Media & Communication Evidence</option>
-              <option value="4">Mobile Device Evidence (GPS Data)</option>
-              <option value="5">Cybercrime Evidence</option>
-              <option value="6">Surveillance & IoT Data</option>
-              <option value="7">Financial & Transactional Evidence</option>
-            </Select>
-          </FormControl>
-          <FormControl id="evidenceDescription" mb={4} isRequired>
-            <FormLabel>Evidence Description</FormLabel>
-            <Textarea placeholder="Enter evidence description" ref={evidenceDescriptionRef} />
-          </FormControl>
-          <FormControl id="file" mb={6} isRequired>
-            <FormLabel>Upload Evidence File</FormLabel>
-            <Input
-              type="file"
-              accept=""
-              onChange={(e) =>
-                setFile(e.target.files ? Array.from(e.target.files) : [])
-              }
-            />
-          </FormControl>
-        </ModalBody>
-        <ModalFooter>
-          <Button
-            colorScheme="teal"
-            isLoading={isSubmittingEvidence}
-            onClick={handleAddEvidence}
-          >
-            Submit Evidence
-          </Button>
-          <Button variant="ghost" onClick={onEvidenceClose}>
-            Cancel
-          </Button>
-        </ModalFooter>
-      </ModalContent>
-    </Modal>
+              Submit Evidence
+            </Button>
+            <Button variant="ghost" onClick={onEvidenceClose}>
+              Cancel
+            </Button>
+          </ModalFooter>
+        </ModalContent>
+      </Modal>
 
-    {/* Audit Trail Modal */}
-    <Modal isOpen={isAuditOpen} onClose={onAuditClose} size="xl">
-      <ModalOverlay />
-      <ModalContent>
-        <ModalHeader>Audit Trail</ModalHeader>
-        <ModalCloseButton />
-        <ModalBody>
-          {auditLoading ? (
-            <Spinner />
-          ) : auditTrail ? (
-            <Box>
-              <Text>
-                <strong>Evidence ID:</strong> {auditTrail.evidenceId}
-              </Text>
-              <VStack spacing={3} align="stretch" mt={4}>
-                {auditTrail.actions.map((action, index) => (
-                  <Box key={index} p={3} borderWidth="1px" borderRadius="md">
-                    <Text>
-                      <strong>Action Type:</strong> {action.actionType}
-                    </Text>
-                    <Text>
-                      <strong>User Address:</strong> {action.userAddress}
-                    </Text>
-                    <Text>
-                      <strong>Timestamp:</strong>{" "}
-                      {new Date(action.timestamp).toLocaleString()}
-                    </Text>
-                    <Text>
-                      <strong>Details:</strong> {action.details}
-                    </Text>
-                    <Text>
-                      <strong>TransactionHash:</strong>{" "}
-                      {action.transactionHash}
-                    </Text>
-                    <Text>
-                      <strong>Block Number:</strong> {action.blockNumber}
-                    </Text>
-                  </Box>
-                ))}
-              </VStack>
-            </Box>
-          ) : (
-            <Text>No audit trail available.</Text>
-          )}
-        </ModalBody>
-      </ModalContent>
-    </Modal>
+      {/* Audit Trail Modal */}
+      <Modal isOpen={isAuditOpen} onClose={onAuditClose} size="xl">
+        <ModalOverlay />
+        <ModalContent>
+          <ModalHeader>Audit Trail</ModalHeader>
+          <ModalCloseButton />
+          <ModalBody>
+            {auditLoading ? (
+              <Spinner />
+            ) : auditTrail ? (
+              <Box>
+                <Text>
+                  <strong>Evidence ID:</strong> {auditTrail.evidenceId}
+                </Text>
+                <VStack spacing={3} align="stretch" mt={4}>
+                  {auditTrail.actions.map((action, index) => (
+                    <Box key={index} p={3} borderWidth="1px" borderRadius="md">
+                      <Text>
+                        <strong>Action Type:</strong> {action.actionType}
+                      </Text>
+                      <Text>
+                        <strong>User Address:</strong> {action.userAddress}
+                      </Text>
+                      <Text>
+                        <strong>Timestamp:</strong>{" "}
+                        {new Date(action.timestamp).toLocaleString()}
+                      </Text>
+                      <Text>
+                        <strong>Details:</strong> {action.details}
+                      </Text>
+                      <Text>
+                        <strong>TransactionHash:</strong>{" "}
+                        {action.transactionHash}
+                      </Text>
+                      <Text>
+                        <strong>Block Number:</strong> {action.blockNumber}
+                      </Text>
+                    </Box>
+                  ))}
+                </VStack>
+              </Box>
+            ) : (
+              <Text>No audit trail available.</Text>
+            )}
+          </ModalBody>
+        </ModalContent>
+      </Modal>
 
-    {/* AI Audit Report Modal */}
-    <Modal isOpen={isReportOpen} onClose={onReportClose} size="xl">
-      <ModalOverlay />
-      <ModalContent>
-        <ModalHeader>AI Audit Report</ModalHeader>
-        <ModalCloseButton />
-        <ModalBody>
-          {aiReport ? (
-            <Box>
-              <Text whiteSpace="pre-wrap">{aiReport}</Text>
-            </Box>
-          ) : (
-            <Spinner />
-          )}
-        </ModalBody>
-        <ModalFooter>
-          <Button colorScheme="teal" onClick={downloadPDF} mr={3}>
-            Download PDF
-          </Button>
-          <Button variant="ghost" onClick={onReportClose}>
-            Close
-          </Button>
-        </ModalFooter>
-      </ModalContent>
-    </Modal>
-  </Box>
-);
+      {/* AI Audit Report Modal */}
+      <Modal isOpen={isReportOpen} onClose={onReportClose} size="xl">
+        <ModalOverlay />
+        <ModalContent>
+          <ModalHeader>AI Audit Report</ModalHeader>
+          <ModalCloseButton />
+          <ModalBody>
+            {aiReport ? (
+              <Box>
+                <Text whiteSpace="pre-wrap">{aiReport}</Text>
+              </Box>
+            ) : (
+              <Spinner />
+            )}
+          </ModalBody>
+          <ModalFooter>
+            <Button colorScheme="teal" onClick={downloadPDF} mr={3}>
+              Download PDF
+            </Button>
+            <Button variant="ghost" onClick={onReportClose}>
+              Close
+            </Button>
+          </ModalFooter>
+        </ModalContent>
+      </Modal>
+    </Box>
+  );
 
 }
