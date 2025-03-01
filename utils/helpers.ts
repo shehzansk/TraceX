@@ -1,86 +1,72 @@
+// helpers.ts
+
 import { CONTRACT_ADDRESS } from "@/const/value";
 import { abi } from "@/const/contract-abi";
 import { ethers } from "ethers";
-
-let provider: ethers.providers.Web3Provider | null = null;
-let contract: ethers.Contract | null = null;
+import { ethereumService } from "@/utils/ethereumService";
 
 /**
- * Initializes the Ethereum provider and contract.
- * Must be executed on the client side.
- */
-export const initializeProvider = async () => {
-  if (typeof window !== "undefined" && (window as any).ethereum) {
-    provider = new ethers.providers.Web3Provider(
-      (window as any).ethereum as ethers.providers.ExternalProvider
-    );
-    // Request access to accounts (ensuring the signer is available)
-    await (window as any).ethereum.request({ method: "eth_requestAccounts" });
-    contract = new ethers.Contract(CONTRACT_ADDRESS, abi, provider);
-  } else {
-    console.error("Please install MetaMask to use this application!");
-    throw new Error("MetaMask not installed");
-  }
-};
-
-/**
- * Returns the admin address from the contract.
+ * Get the admin address of the contract.
  */
 export const getAdmin = async () => {
   try {
-    await initializeProvider();
-    const signer = provider!.getSigner();
-    const contractWithSigner = contract!.connect(signer);
-    const admin = await contractWithSigner.admin();
-    return admin.toLowerCase();
-  } catch (err: any) {
-    console.error(err);
-    throw err;
+    // Ensure the ethereumService is initialized
+    if (!ethereumService.contract) {
+      await ethereumService.initialize();
+    }
+    const contract = ethereumService.contract!;
+    const adminAddress = await contract.admin();
+    return adminAddress.toLowerCase();
+  } catch (e) {
+    console.error(e);
+    throw e;
   }
 };
 
 /**
- * Retrieves the role of a user.
+ * Get the role of the specified address.
  */
-export const getRole = async (userAddress: string) => {
+export const getRole = async (address: string) => {
   try {
-    await initializeProvider();
-    const signer = provider!.getSigner();
-    const contractWithSigner = contract!.connect(signer);
-    const role = await contractWithSigner.roles(userAddress);
+    if (!ethereumService.contract) {
+      await ethereumService.initialize();
+    }
+    const contract = ethereumService.contract!;
+    const role = await contract.roles(address);
     return role;
-  } catch (err: any) {
-    console.error(err);
-    throw err;
+  } catch (e) {
+    console.error(e);
+    throw e;
   }
 };
 
 /**
- * Retrieves the name associated with a user address.
+ * Get the name associated with the specified address.
  */
-export const getName = async (userAddress: string) => {
+export const getName = async (address: string) => {
   try {
-    await initializeProvider();
-    const signer = provider!.getSigner();
-    const contractWithSigner = contract!.connect(signer);
-    const name = await contractWithSigner.names(userAddress);
+    if (!ethereumService.contract) {
+      await ethereumService.initialize();
+    }
+    const contract = ethereumService.contract!;
+    const name = await contract.names(address);
     return name;
-  } catch (err: any) {
-    console.error(err);
-    throw err;
+  } catch (e) {
+    console.error(e);
+    throw e;
   }
 };
 
 /**
- * Adds a new member to the network.
- * Only callable by the admin.
+ * Add a new member to the contract.
  */
 export const addMember = async (newMember: string, name: string, role: number) => {
   try {
-    await initializeProvider();
-    const signer = provider!.getSigner();
-    const contractWithSigner = contract!.connect(signer);
-    const tx = await contractWithSigner.addMember(newMember, name, role);
+    if (!ethereumService.contract) {
+      await ethereumService.initialize();
+    }
+    const contract = ethereumService.contract!;
+    const tx = await contract.addMember(newMember, name, role);
     await tx.wait();
     return { status: true };
   } catch (err: any) {
@@ -90,15 +76,15 @@ export const addMember = async (newMember: string, name: string, role: number) =
 };
 
 /**
- * Changes the role of an existing member.
- * Only callable by the admin.
+ * Change the role of an existing member.
  */
-export const changeRole = async (memberAddress: string, newRole: number) => {
+export const changeRole = async (memberAddress: string, role: number) => {
   try {
-    await initializeProvider();
-    const signer = provider!.getSigner();
-    const contractWithSigner = contract!.connect(signer);
-    const tx = await contractWithSigner.changeRole(memberAddress, newRole);
+    if (!ethereumService.contract) {
+      await ethereumService.initialize();
+    }
+    const contract = ethereumService.contract!;
+    const tx = await contract.changeRole(memberAddress, role);
     await tx.wait();
     return { status: true };
   } catch (err: any) {
@@ -108,25 +94,30 @@ export const changeRole = async (memberAddress: string, newRole: number) => {
 };
 
 /**
- * Retrieves all members.
- * Only callable by the admin.
+ * Get all members from the contract.
  */
 export const getAllMembers = async () => {
   try {
-    await initializeProvider();
-    const signer = provider!.getSigner();
+    if (!ethereumService.contract || !ethereumService.signer) {
+      await ethereumService.initialize();
+    }
+    const signer = ethereumService.signer!;
     const userAddress = (await signer.getAddress()).toLowerCase();
     const adminAddress = await getAdmin();
+
     if (userAddress !== adminAddress.toLowerCase()) {
       throw new Error("Only admin can access members list.");
     }
-    const contractWithSigner = contract!.connect(signer);
-    const [memberAddresses, rolesList, namesList] = await contractWithSigner.getAllMembers();
-    const members = memberAddresses.map((address: string, index: number) => ({
+
+    const contract = ethereumService.contract!;
+    const result = await contract.getAllMembers();
+
+    const members = result[0].map((address: string, idx: number) => ({
       address,
-      role: rolesList[index],
-      name: namesList[index],
+      role: result[1][idx],
+      name: result[2][idx],
     }));
+
     return { members, status: true };
   } catch (err: any) {
     console.error(err);
@@ -135,31 +126,31 @@ export const getAllMembers = async () => {
 };
 
 /**
- * Registers a new case.
- * Only callable by Collectors and Admin.
+ * Add a new case to the contract.
  */
 export const addCase = async (
   courtId: string,
+  caseId: number,
   caseDescription: string,
   caseType: string,
   petitioner: string,
   respondent: string,
-  startDateTime: string,
-  status: string
+  startDateTime: number
 ) => {
   try {
-    await initializeProvider();
-    const signer = provider!.getSigner();
-    const contractWithSigner = contract!.connect(signer);
-    const totalCases = await contractWithSigner.totalCases();
-    const tx = await contractWithSigner.registerCase(
+    if (!ethereumService.contract) {
+      await ethereumService.initialize();
+    }
+    const contract = ethereumService.contract!;
+    const totalCases = await contract.totalCases();
+    const tx = await contract.registerCase(
       courtId,
+      caseId,
       caseDescription,
       caseType,
       petitioner,
       respondent,
-      startDateTime,
-      status
+      startDateTime
     );
     await tx.wait();
     return { newCaseId: totalCases.toNumber() + 1, status: true };
@@ -170,80 +161,80 @@ export const addCase = async (
 };
 
 /**
- * Registers new evidence for a given case.
- * Only callable by Collectors and Admin.
+ * Add evidence to a case.
  */
 export const addEvidence = async (
-  caseId: string,
+  caseId: number,
   evidenceId: number,
   officerName: string,
   location: string,
-  evidenceDescription: string,
-  fileUrl: string,
-  evidenceType: number
+  description: string,
+  fileHash: string,
+  evidenceType: string
 ) => {
   try {
-    await initializeProvider();
-    const signer = provider!.getSigner();
-    const contractWithSigner = contract!.connect(signer);
+    if (!ethereumService.contract || !ethereumService.signer) {
+      await ethereumService.initialize();
+    }
+    const signer = ethereumService.signer!;
+    const contract = ethereumService.contract!;
 
-    const tx = await contractWithSigner.registerEvidence(
+    const tx = await contract.registerEvidence(
       caseId,
       evidenceId,
       officerName,
       location,
-      evidenceDescription,
-      fileUrl,
+      description,
+      fileHash,
       evidenceType
     );
+
     const receipt = await tx.wait();
 
-    // Prepare the audit trail data
+    // Audit trail logging (assuming you have an API endpoint)
     const auditTrailData = {
       evidenceId,
       actions: [
         {
-          actionType: 'EvidenceRegistered',
+          actionType: "EvidenceRegistered",
           timestamp: new Date(),
           userAddress: await signer.getAddress(),
           details: `Evidence registered by ${officerName} at ${location}`,
           transactionHash: receipt.transactionHash,
-          blockNumber: receipt.blockNumber
+          blockNumber: receipt.blockNumber,
         },
       ],
     };
 
-    // Log data into MongoDB via API call
-    const response = await fetch('/api/auditTrail', {
-      method: 'POST',
+    const response = await fetch("/api/auditTrail", {
+      method: "POST",
       headers: {
-        'Content-Type': 'application/json',
+        "Content-Type": "application/json",
       },
       body: JSON.stringify(auditTrailData),
     });
 
     if (!response.ok) {
-      throw new Error('Failed to log audit trail');
+      throw new Error("Failed to log audit trail");
     }
 
     return { status: true };
-  } catch (err) {
+  } catch (err: any) {
     console.error(err);
     return { status: false, error: err.message };
   }
 };
 
-
 /**
- * Changes the status of a case.
- * Only callable by Collectors and Admin.
+ * Change the status of a case.
  */
-export const changeCaseStatus = async (caseId: string, newStatus: string) => {
+export const changeCaseStatus = async (caseId: number, newStatus: string) => {
   try {
-    await initializeProvider();
-    const signer = provider!.getSigner();
-    const contractWithSigner = contract!.connect(signer);
-    const tx = await contractWithSigner.changeCaseStatus(caseId, newStatus);
+    if (!ethereumService.contract) {
+      await ethereumService.initialize();
+    }
+    const contract = ethereumService.contract!;
+    const tx = await contract.changeCaseStatus(caseId, newStatus);
     await tx.wait();
     return { status: true };
   } catch (err: any) {
@@ -253,32 +244,35 @@ export const changeCaseStatus = async (caseId: string, newStatus: string) => {
 };
 
 /**
- * Retrieves all case IDs and details.
- * Accessible by Analysts and above.
+ * Get all cases from the contract.
  */
 export const getAllCases = async () => {
   try {
-    await initializeProvider();
-    const signer = provider!.getSigner();
-    const contractWithSigner = contract!.connect(signer);
-    const caseIds = await contractWithSigner.getAllCaseIds();
+    if (!ethereumService.contract) {
+      await ethereumService.initialize();
+    }
+    const contract = ethereumService.contract!;
+    const caseIds = await contract.getAllCaseIds();
+
     const cases = [];
     for (let i = 0; i < caseIds.length; i++) {
-      const caseId = caseIds[i].toNumber();
-      const caseDetails = await contractWithSigner.getCaseById(caseId);
+      const caseIdNum = caseIds[i].toNumber();
+      const caseData = await contract.getCaseById(caseIdNum);
+
       cases.push({
-        courtId: caseDetails[0],
-        caseId: caseDetails[1].toNumber(),
-        caseDescription: caseDetails[2],
-        caseType: caseDetails[3],
-        petitioner: caseDetails[4],
-        respondent: caseDetails[5],
-        startDateTime: caseDetails[6],
-        status: caseDetails[7],
-        submittedBy: caseDetails[8],
-        totalEvidences: caseDetails[9].toNumber(),
+        courtId: caseData[0],
+        caseId: caseData[1].toNumber(),
+        caseDescription: caseData[2],
+        caseType: caseData[3],
+        petitioner: caseData[4],
+        respondent: caseData[5],
+        startDateTime: caseData[6],
+        status: caseData[7],
+        submittedBy: caseData[8],
+        totalEvidences: caseData[9].toNumber(),
       });
     }
+
     return { cases, status: true };
   } catch (err: any) {
     console.error(err);
@@ -287,30 +281,35 @@ export const getAllCases = async () => {
 };
 
 /**
- * Retrieves all evidences for a case.
- * Accessible by Analysts and above.
+ * Get evidences for a specific case.
  */
-export const getEvidences = async (caseId: string) => {
+export const getEvidences = async (caseId: number) => {
   try {
-    await initializeProvider();
-    const signer = provider!.getSigner();
-    const contractWithSigner = contract!.connect(signer);
-    const totalEvidences = await contractWithSigner.getTotalEvidences(caseId);
+    if (!ethereumService.contract) {
+      await ethereumService.initialize();
+    }
+    const contract = ethereumService.contract!;
+    const totalEvidences = await contract.getTotalEvidences(caseId);
     const evidences = [];
+
     for (let i = 1; i <= totalEvidences.toNumber(); i++) {
-      const evidenceDetails = await contractWithSigner.getEvidenceByIndex(caseId, i);
+      const evidenceData = await contract.getEvidenceByIndex(caseId, i);
+
       evidences.push({
-        evidenceId: evidenceDetails[0].toNumber(),
-        officerName: evidenceDetails[1],
-        location: evidenceDetails[2],
-        description: evidenceDetails[3],
-        fileHash: evidenceDetails[4],
-        evidenceType: evidenceDetails[5],
-        owner: evidenceDetails[6],
-        timestamp: evidenceDetails[7].toNumber(),
+        evidenceId: evidenceData[0].toNumber(),
+        officerName: evidenceData[1],
+        location: evidenceData[2],
+        description: evidenceData[3],
+        fileHash: evidenceData[4],
+        evidenceType: evidenceData[5],
+        owner: evidenceData[6],
+        timestamp: evidenceData[7].toNumber(),
       });
     }
+
+    // Sort evidences by timestamp
     evidences.sort((a, b) => a.timestamp - b.timestamp);
+
     return { evidences, status: true };
   } catch (err: any) {
     console.error(err);
@@ -319,28 +318,30 @@ export const getEvidences = async (caseId: string) => {
 };
 
 /**
- * Retrieves case details by ID.
- * Accessible by Analysts and above.
+ * Get case details by ID.
  */
 export const getCaseById = async (caseId: number) => {
   try {
-    await initializeProvider();
-    const signer = provider!.getSigner();
-    const contractWithSigner = contract!.connect(signer);
-    const caseDetails = await contractWithSigner.getCaseById(caseId);
-    const formattedCase = {
-      courtId: caseDetails[0],
-      caseId: caseDetails[1].toNumber(),
-      caseDescription: caseDetails[2],
-      caseType: caseDetails[3],
-      petitioner: caseDetails[4],
-      respondent: caseDetails[5],
-      startDateTime: caseDetails[6],
-      status: caseDetails[7],
-      submittedBy: caseDetails[8],
-      totalEvidences: caseDetails[9].toNumber(),
+    if (!ethereumService.contract) {
+      await ethereumService.initialize();
+    }
+    const contract = ethereumService.contract!;
+    const caseData = await contract.getCaseById(caseId);
+
+    const caseDetails = {
+      courtId: caseData[0],
+      caseId: caseData[1].toNumber(),
+      caseDescription: caseData[2],
+      caseType: caseData[3],
+      petitioner: caseData[4],
+      respondent: caseData[5],
+      startDateTime: caseData[6],
+      status: caseData[7],
+      submittedBy: caseData[8],
+      totalEvidences: caseData[9].toNumber(),
     };
-    return { caseDetails: formattedCase, status: true };
+
+    return { caseDetails, status: true };
   } catch (err: any) {
     console.error(err);
     return { status: false, error: err.message };
@@ -348,15 +349,17 @@ export const getCaseById = async (caseId: number) => {
 };
 
 /**
- * Checks if the current user is at least an Analyst.
+ * Check if the current user is at least an analyst.
  */
-export const isAtLeastAnalyst = async (): Promise<boolean> => {
+export const isAtLeastAnalyst = async () => {
   try {
-    await initializeProvider();
-    const signer = provider!.getSigner();
-    const userAddress = (await signer.getAddress()).toLowerCase();
-    const role = await getRole(userAddress);
-    return role >= 1; // 1: Admin, 2: Collector, 3: Analyst
+    if (!ethereumService.signer) {
+      await ethereumService.initialize();
+    }
+    const signer = ethereumService.signer!;
+    const address = (await signer.getAddress()).toLowerCase();
+    const role = await getRole(address);
+    return role >= 1;
   } catch (err: any) {
     console.error(err);
     return false;
@@ -364,15 +367,17 @@ export const isAtLeastAnalyst = async (): Promise<boolean> => {
 };
 
 /**
- * Checks if the current user is a Collector or Admin.
+ * Check if the current user is a collector or admin.
  */
-export const isCollectorOrAdmin = async (): Promise<boolean> => {
+export const isCollectorOrAdmin = async () => {
   try {
-    await initializeProvider();
-    const signer = provider!.getSigner();
-    const userAddress = (await signer.getAddress()).toLowerCase();
-    const role = await getRole(userAddress);
-    return role === 1 || role === 2; // 1: Admin, 2: Collector
+    if (!ethereumService.signer) {
+      await ethereumService.initialize();
+    }
+    const signer = ethereumService.signer!;
+    const address = (await signer.getAddress()).toLowerCase();
+    const role = await getRole(address);
+    return role === 1 || role === 2;
   } catch (err: any) {
     console.error(err);
     return false;
@@ -380,11 +385,8 @@ export const isCollectorOrAdmin = async (): Promise<boolean> => {
 };
 
 /**
- * Converts an IPFS URI to a URL accessible in browsers.
+ * Convert IPFS URI to a usable HTTP URL.
  */
-export function convertIPFSUriToUrl(ipfsUri: string): string {
-  if (ipfsUri.includes("ipfs://")) {
-    return ipfsUri.replace("ipfs://", "https://ipfs.io/ipfs/");
-  }
-  return ipfsUri;
+export function convertIPFSUriToUrl(uri: string) {
+  return uri.includes("ipfs://") ? uri.replace("ipfs://", "https://ipfs.io/ipfs/") : uri;
 }

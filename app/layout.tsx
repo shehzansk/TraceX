@@ -5,7 +5,8 @@ import { Providers } from "./providers";
 import Header from "@/components/header";
 import TopBar from "@/components/Topbar";
 import clsx from "clsx";
-
+import { useEffect, useState } from 'react';
+import { useToast } from '@chakra-ui/react';
 import "@rainbow-me/rainbowkit/styles.css";
 import {
   RainbowKitProvider,
@@ -22,6 +23,7 @@ import { sepolia } from "wagmi/chains";
 import { alchemyProvider } from "wagmi/providers/alchemy";
 import { publicProvider } from "wagmi/providers/public";
 import { ThirdwebProvider } from "@thirdweb-dev/react";
+import { ethereumService } from '@/utils/ethereumService';
 
 const { chains, publicClient } = configureChains(
   [sepolia],
@@ -57,6 +59,30 @@ export default function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
+  const [walletConnected, setWalletConnected] = useState(false);
+  const toast = useToast();
+  useEffect(() => {
+    const initializeEthereum = async () => {
+      try {
+        await ethereumService.initialize();
+        setWalletConnected(true);
+      } catch (error: any) {
+        console.error('Failed to initialize Ethereum service');
+        setWalletConnected(false);
+        toast({
+          title: 'Wallet Not Connected',
+          description:
+            error.message || 'Please connect your wallet to use this application.',
+          status: 'info',
+          duration: 2000, // Toast will disappear after 2 seconds
+          isClosable: true, // User can dismiss it manually
+          position: 'top', // Display the toast at the top of the screen
+        });
+      }
+    };
+
+    initializeEthereum();
+  }, [toast]);
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
