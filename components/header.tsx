@@ -12,12 +12,25 @@ declare global {
 const Header = () => {
     const [currentTime, setCurrentTime] = useState<Date | null>(null);
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+    const [fontScale, setFontScale] = useState<number>(1);
 
     useEffect(() => {
         setCurrentTime(new Date());
         const timer = setInterval(() => setCurrentTime(new Date()), 1000);
         return () => clearInterval(timer);
     }, []);
+
+    useEffect(() => {
+        const savedScale = localStorage.getItem("fontScale");
+        if (savedScale) {
+            setFontScale(parseFloat(savedScale));
+        }
+    }, []);
+
+    useEffect(() => {
+        document.documentElement.style.fontSize = `${fontScale * 100}%`;
+        localStorage.setItem("fontScale", fontScale.toString());
+    }, [fontScale]);
 
     useEffect(() => {
         const scriptId = "google-translate-script";
@@ -47,6 +60,10 @@ const Header = () => {
         }
     };
 
+    const increaseFont = () => setFontScale((prev) => Math.min(prev + 0.1, 1.5));
+    const decreaseFont = () => setFontScale((prev) => Math.max(prev - 0.1, 0.8));
+    const resetFont = () => setFontScale(1);
+
     const formatDateTime = (date: Date) => {
         const day = date.getDate();
         const month = date.toLocaleString("default", { month: "long" });
@@ -74,9 +91,9 @@ const Header = () => {
                         <a href="/" className="text-white no-underline">⛓️ TraceX</a>
                         <span>|</span>
                         <div>
-                            <button className="m-1 text-xs">-A</button>
-                            <button className="m-1 text-xs">A</button>
-                            <button className="m-1 text-xs">+A</button>
+                            <button onClick={decreaseFont} className="m-1 text-xs bg-gray-200 text-black px-2 py-1 rounded-md">-A</button>
+                            <button onClick={resetFont} className="m-1 text-xs bg-gray-200 text-black px-2 py-1 rounded-md">A</button>
+                            <button onClick={increaseFont} className="m-1 text-xs bg-gray-200 text-black px-2 py-1 rounded-md">+A</button>
                         </div>
                         <span>|</span>
                         <select className="text-black bg-white border border-gray-300 p-1 text-xs" onChange={(e) => changeLanguage(e.target.value)}>
@@ -96,9 +113,9 @@ const Header = () => {
                     <a href="/" className="text-white no-underline">⛓️ TraceX</a>
                     <span>|</span>
                     <div>
-                        <button className="m-1 text-xs">-A</button>
-                        <button className="m-1 text-xs">A</button>
-                        <button className="m-1 text-xs">+A</button>
+                        <button onClick={decreaseFont} className="m-1 text-xs bg-gray-200 text-black px-2 py-1 rounded-md">-A</button>
+                        <button onClick={resetFont} className="m-1 text-xs bg-gray-200 text-black px-2 py-1 rounded-md">A</button>
+                        <button onClick={increaseFont} className="m-1 text-xs bg-gray-200 text-black px-2 py-1 rounded-md">+A</button>
                     </div>
                     <span>|</span>
                     <select className="text-black bg-white border border-gray-300 p-1 text-xs" onChange={(e) => changeLanguage(e.target.value)}>
