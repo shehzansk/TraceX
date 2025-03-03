@@ -1,10 +1,6 @@
 // helpers.ts
-
-import { CONTRACT_ADDRESS } from "@/const/value";
-import { abi } from "@/const/contract-abi";
-import { ethers } from "ethers";
 import { ethereumService } from "@/utils/ethereumService";
-
+import { ethers } from "ethers"
 /**
  * Get the admin address of the contract.
  */
@@ -381,6 +377,84 @@ export const isCollectorOrAdmin = async () => {
   } catch (err: any) {
     console.error(err);
     return false;
+  }
+};
+
+export const transferEvidenceCustody = async (
+  caseId: number | string,
+  evidenceId: number | string,
+  newOwnerAddress: string
+) => {
+  try {
+    console.log("caseId:", caseId);
+    console.log("evidenceId:", evidenceId);
+    console.log("newOwnerAddress:", newOwnerAddress);
+
+    if (!ethereumService.contract || !ethereumService.signer) {
+      await ethereumService.initialize();
+    }
+
+    const signer = ethereumService.signer!;
+    const contract = ethereumService.contract!;
+
+    // Typecast caseId and evidenceId to numbers
+    const caseIdNum = Number(caseId);
+    const evidenceIdNum = Number(evidenceId);
+
+    // Validate that they are now numbers and not NaN
+    if (isNaN(caseIdNum) || isNaN(evidenceIdNum)) {
+      throw new Error("caseId and evidenceId must be valid numbers");
+    }
+
+    // Ensure newOwnerAddress is valid
+    if (!ethers.utils.isAddress(newOwnerAddress)) {
+      throw new Error("Invalid new owner address");
+    }
+
+    // Interact with the contract using numbers
+    const tx = await contract.transferEvidenceCustody(
+      caseIdNum,
+      evidenceIdNum,
+      newOwnerAddress
+    );
+
+    const receipt = await tx.wait();
+    const transactionHash = receipt.transactionHash;
+    const blockNumber = receipt.blockNumber;
+
+    // Audit trail logging
+    const userAddress = (await signer.getAddress()).toLowerCase();
+
+    const auditTrailData = {
+      evidenceId: evidenceIdNum,
+      actions: [
+        {
+          actionType: "CustodyTransferred",
+          timestamp: new Date(),
+          userAddress,
+          details: `Custody transferred to ${newOwnerAddress}`,
+          transactionHash,
+          blockNumber,
+        },
+      ],
+    };
+
+    const response = await fetch("/api/auditTrail", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(auditTrailData),
+    });
+
+    if (!response.ok) {
+      throw new Error("Failed to log audit trail");
+    }
+
+    return { status: true };
+  } catch (err: any) {
+    console.error(err);
+    return { status: false, error: err.message };
   }
 };
 

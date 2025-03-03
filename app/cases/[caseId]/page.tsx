@@ -1,6 +1,7 @@
 "use client";
 import { Colors } from "chart.js";
 import { useEffect, useState, useRef } from "react";
+import { ethers } from "ethers";
 import {
   Box,
   Heading,
@@ -50,9 +51,9 @@ import {
 } from "chart.js";
 import "chartjs-adapter-date-fns";
 import jsPDF from "jspdf";
-import autoTable from "jspdf-autotable";
 import { useStorageUpload } from "@thirdweb-dev/react";
 import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
+import { transferEvidenceCustody } from "@/utils/helpers";
 
 // Register the necessary Chart.js controllers/elements
 ChartJS.register(
@@ -80,6 +81,8 @@ export default function CaseDetails({ params }) {
   const [auditTrail, setAuditTrail] = useState(null);
   const [auditLoading, setAuditLoading] = useState(false);
   const [aiReport, setAiReport] = useState("");
+  const [isTransferring, setIsTransferring] = useState(false);
+  const [selectedEvidence, setSelectedEvidence] = useState(null);
   const {
     isOpen: isAuditOpen,
     onOpen: onAuditOpen,
@@ -95,6 +98,10 @@ export default function CaseDetails({ params }) {
     onOpen: onEvidenceOpen,
     onClose: onEvidenceClose,
   } = useDisclosure();
+  const { isOpen: isTransferOpen,
+    onOpen: onTransferOpen,
+    onClose: onTransferClose
+  } = useDisclosure();
   const toast = useToast();
   const [isSubmittingEvidence, setIsSubmittingEvidence] = useState(false);
   const [file, setFile] = useState([]);
@@ -103,6 +110,7 @@ export default function CaseDetails({ params }) {
   const officerNameRef = useRef(null);
   const locationRef = useRef(null);
   const evidenceDescriptionRef = useRef(null);
+  const newOwnerAddressRef = useRef(null);
 
   const closeAllModals = () => {
     onEvidenceClose();
@@ -123,6 +131,12 @@ export default function CaseDetails({ params }) {
   const openReportModal = () => {
     closeAllModals();
     onReportOpen();
+  };
+
+  const openTransferModal = (evidence) => {
+    closeAllModals();
+    setSelectedEvidence(evidence);
+    onTransferOpen();
   };
 
   useEffect(() => {
@@ -299,6 +313,74 @@ Instructions:
     doc.setFontSize(12);
     doc.text(lines, 15, 30);
     doc.save(`AI_Audit_Report_Case_${caseId}.pdf`);
+  };
+
+  const handleCustodyTransfer = async () => {
+    setIsTransferring(true);
+    try {
+      if (!newOwnerAddressRef.current?.value) {
+        toast({
+          title: "New owner address is required.",
+          status: "error",
+          duration: 5000,
+          isClosable: true,
+        });
+        setIsTransferring(false);
+        return;
+      }
+
+      const newOwnerAddress = newOwnerAddressRef.current.value.trim();
+
+      // Validate newOwnerAddress
+      if (!ethers.utils.isAddress(newOwnerAddress)) {
+        toast({
+          title: "Invalid owner address.",
+          status: "error",
+          duration: 5000,
+          isClosable: true,
+        });
+        setIsTransferring(false);
+        return;
+      }
+
+      const transferResponse = await transferEvidenceCustody(
+        caseId,
+        selectedEvidence.evidenceId, // Changed to evidenceId
+        newOwnerAddress
+      );
+
+      if (transferResponse.status) {
+        toast({
+          title: "Custody transferred successfully.",
+          status: "success",
+          duration: 5000,
+          isClosable: true,
+        });
+        onTransferClose();
+      } else {
+        let errorMsg = "An unknown error occurred.";
+        const match = transferResponse.error.match(/reason="([^"]+)"/);
+        errorMsg = match ? match[1] : transferResponse.error;
+        toast({
+          title: "Failed to transfer custody.",
+          description: errorMsg,
+          status: "error",
+          duration: 5000,
+          isClosable: true,
+        });
+      }
+    } catch (err: any) {
+      console.error(err);
+      toast({
+        title: "Error",
+        description: err.message || "An unknown error occurred.",
+        status: "error",
+        duration: 5000,
+        isClosable: true,
+      });
+    } finally {
+      setIsTransferring(false);
+    }
   };
 
   // Build bubble chart data
@@ -559,9 +641,9 @@ Instructions:
         <Box
           flex="1"
           height={["250px", "350px", "400px"]}
-          maxH={["250px", "350px", "400px"]}
-          overflow="hidden"
+          maxH={["255px", "355px", "405px"]}
           position="relative"
+          overflow="auto"
         >
           <Heading as="h2" size={["md", "lg"]} mb={[2, 4]}>
             Case Timeline
@@ -676,8 +758,13 @@ Instructions:
                   justify={["center", "flex-end"]}
                   mt={5}
                   mb={4}
-                  wrap="wrap"
+                  wrap={["wrap", "nowrap"]}
                 >
+                  {canEdit && (
+                    <Button colorScheme="purple" size={["sm", "md"]} onClick={() => openTransferModal(evidence)}>
+                      Transfer Custody
+                    </Button>
+                  )}
                   <Button
                     onClick={() => fetchAuditTrail(evidence.evidenceId)}
                     colorScheme="blue"
@@ -796,15 +883,14 @@ Instructions:
                         <strong>User Address:</strong> {action.userAddress}
                       </Text>
                       <Text>
-                        <strong>Timestamp:</strong>{" "}
+                        <strong>Timestamp:</strong>{' '}
                         {new Date(action.timestamp).toLocaleString()}
                       </Text>
                       <Text>
                         <strong>Details:</strong> {action.details}
                       </Text>
                       <Text>
-                        <strong>TransactionHash:</strong>{" "}
-                        {action.transactionHash}
+                        <strong>Transaction Hash:</strong> {action.transactionHash}
                       </Text>
                       <Text>
                         <strong>Block Number:</strong> {action.blockNumber}
@@ -842,6 +928,27 @@ Instructions:
             <Button variant="ghost" onClick={onReportClose}>
               Close
             </Button>
+          </ModalFooter>
+        </ModalContent>
+      </Modal>
+
+      {/* Transfer Custody Modal */}
+      <Modal isOpen={isTransferOpen} onClose={onTransferClose}>
+        <ModalOverlay />
+        <ModalContent>
+          <ModalHeader>Transfer Custody</ModalHeader>
+          <ModalCloseButton />
+          <ModalBody>
+            <FormControl isRequired>
+              <FormLabel>New Owner Wallet Address</FormLabel>
+              <Input ref={newOwnerAddressRef} placeholder="0x..." />
+            </FormControl>
+          </ModalBody>
+          <ModalFooter>
+            <Button colorScheme="blue" mr={3} onClick={handleCustodyTransfer} isLoading={isTransferring}>
+              Transfer
+            </Button>
+            <Button variant="ghost" onClick={onTransferClose}>Cancel</Button>
           </ModalFooter>
         </ModalContent>
       </Modal>

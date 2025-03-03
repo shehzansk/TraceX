@@ -2,27 +2,17 @@
 pragma solidity ^0.8.0;
 
 contract SecurexPrivateV2 {
-    // Admin address
     address public admin;
 
-    // Roles
     enum Role {
         None,
         Admin,
         Collector,
         Analyst
     }
-
-    // Mapping from address to role
     mapping(address => Role) public roles;
-
-    // Mapping from address to name
     mapping(address => string) public names;
-
-    // List of all member addresses
     address[] public members;
-
-    // --- Structures and Enums ---
 
     enum EvidenceType {
         Forensic,
@@ -36,8 +26,8 @@ contract SecurexPrivateV2 {
     }
 
     struct Evidence {
-        uint256 evidenceIndex; // Index of the evidence in the case
-        uint256 evidenceId; // 6-digit number provided by user
+        uint256 evidenceIndex; // Internal index
+        uint256 evidenceId; // External ID (6-digit number)
         string officerName;
         string location;
         string description;
@@ -57,21 +47,19 @@ contract SecurexPrivateV2 {
         string startDateTime;
         string status;
         address submittedBy;
-        mapping(uint256 => Evidence) evidences; // Mapping of evidenceIndex to Evidence
+        mapping(uint256 => Evidence) evidences; // Mapping from evidenceIndex to Evidence
+        mapping(uint256 => uint256) evidenceIdToIndex; // Mapping from evidenceId to evidenceIndex
         uint256 totalEvidences;
         bool initialised;
     }
 
-    // Mapping of case ID to Case struct and list of all case IDs
-    mapping(uint256 => Case) public cases;
+    mapping(uint256 => Case) public cases; // Mapping from caseId to Case
     uint256[] public caseIds;
-
     uint256 public totalCases;
-
-    // --- Events ---
 
     event MemberAdded(address indexed member, string name, Role role);
     event RoleChanged(address indexed member, Role newRole);
+
     event CaseRegistered(
         string courtId,
         uint256 indexed caseId,
@@ -84,6 +72,7 @@ contract SecurexPrivateV2 {
         string startDateTime,
         string status
     );
+
     event EvidenceRegistered(
         uint256 indexed caseId,
         uint256 indexed evidenceIndex,
@@ -96,9 +85,16 @@ contract SecurexPrivateV2 {
         address indexed owner,
         uint256 timestamp
     );
-    event StatusChanged(uint256 indexed caseId, string newStatus);
 
-    // --- Modifiers ---
+    event CustodyTransferred(
+        uint256 indexed caseId,
+        uint256 indexed evidenceId,
+        address indexed previousOwner,
+        address newOwner,
+        uint256 timestamp
+    );
+
+    event StatusChanged(uint256 indexed caseId, string newStatus);
 
     modifier onlyAdmin() {
         require(
@@ -128,18 +124,14 @@ contract SecurexPrivateV2 {
         _;
     }
 
-    // --- Constructor ---
-
     constructor() {
         admin = msg.sender;
-        roles[msg.sender] = Role.Admin; // Deployer is the admin
+        roles[msg.sender] = Role.Admin;
         members.push(msg.sender);
         names[msg.sender] = "Admin";
     }
 
-    // --- Admin Functions ---
-
-    /// @notice Add a new member with a role and name
+    // Function to add new member
     function addMember(
         address _member,
         string calldata _name,
@@ -153,19 +145,17 @@ contract SecurexPrivateV2 {
         roles[_member] = _role;
         names[_member] = _name;
         members.push(_member);
-
         emit MemberAdded(_member, _name, _role);
     }
 
-    /// @notice Change the role of an existing member
+    // Function to change member role
     function changeRole(address _member, Role _newRole) external onlyAdmin {
         require(roles[_member] != Role.None, "Member does not exist");
         roles[_member] = _newRole;
-
         emit RoleChanged(_member, _newRole);
     }
 
-    /// @notice Get list of all members
+    // Function to get all members
     function getAllMembers()
         external
         view
@@ -180,13 +170,10 @@ contract SecurexPrivateV2 {
             rolesList[i] = roles[members[i]];
             namesList[i] = names[members[i]];
         }
-
         return (members, rolesList, namesList);
     }
 
-    // --- Case Functions ---
-
-    /// @notice Register a new case
+    // Function to register a new case
     function registerCase(
         string calldata _courtId,
         string calldata _caseDescription,
@@ -222,7 +209,6 @@ contract SecurexPrivateV2 {
         newCase.submittedBy = msg.sender;
         newCase.totalEvidences = 0;
         newCase.initialised = true;
-
         caseIds.push(caseId);
 
         emit CaseRegistered(
@@ -239,21 +225,17 @@ contract SecurexPrivateV2 {
         );
     }
 
-    /// @notice Change case status
+    // Function to change case status
     function changeCaseStatus(
         uint256 _caseId,
         string calldata _newStatus
     ) external onlyCollector {
         require(cases[_caseId].initialised, "Case does not exist");
-
         cases[_caseId].status = _newStatus;
-
         emit StatusChanged(_caseId, _newStatus);
     }
 
-    // --- Evidence Functions ---
-
-    /// @notice Register new evidence for a given case
+    // Function to register evidence
     function registerEvidence(
         uint256 _caseId,
         uint256 _evidenceId,
@@ -278,11 +260,9 @@ contract SecurexPrivateV2 {
         );
 
         Case storage currentCase = cases[_caseId];
-
         currentCase.totalEvidences++;
         uint256 evidenceIndex = currentCase.totalEvidences;
 
-        // Store evidence
         currentCase.evidences[evidenceIndex] = Evidence({
             evidenceIndex: evidenceIndex,
             evidenceId: _evidenceId,
@@ -294,6 +274,9 @@ contract SecurexPrivateV2 {
             owner: msg.sender,
             timestamp: block.timestamp
         });
+
+        // Map evidenceId to evidenceIndex for quick lookup
+        currentCase.evidenceIdToIndex[_evidenceId] = evidenceIndex;
 
         emit EvidenceRegistered(
             _caseId,
@@ -309,19 +292,53 @@ contract SecurexPrivateV2 {
         );
     }
 
-    // --- View Functions ---
+    // Function to transfer custody of an evidence using evidenceId
+    function transferEvidenceCustody(
+        uint256 _caseId,
+        uint256 _evidenceId,
+        address _newOwner
+    ) external onlyCollector {
+        require(cases[_caseId].initialised, "Case does not exist");
+        require(
+            roles[_newOwner] != Role.None,
+            "New owner must be a registered member"
+        );
 
-    /// @notice Retrieve the role of an address
+        Case storage currentCase = cases[_caseId];
+
+        // Get the evidenceIndex from evidenceId
+        uint256 evidenceIndex = currentCase.evidenceIdToIndex[_evidenceId];
+        require(evidenceIndex != 0, "Evidence not found");
+
+        Evidence storage evd = currentCase.evidences[evidenceIndex];
+        require(
+            evd.owner == msg.sender,
+            "Only current owner can transfer custody"
+        );
+
+        address previousOwner = evd.owner;
+        evd.owner = _newOwner;
+
+        emit CustodyTransferred(
+            _caseId,
+            _evidenceId,
+            previousOwner,
+            _newOwner,
+            block.timestamp
+        );
+    }
+
+    // Function to get role of an address
     function getRole(address _address) external view returns (Role) {
         return roles[_address];
     }
 
-    /// @notice Retrieve the name of an address
+    // Function to get name associated with an address
     function getName(address _address) external view returns (string memory) {
         return names[_address];
     }
 
-    /// @notice Retrieve all registered case IDs
+    // Function to get all case IDs
     function getAllCaseIds()
         external
         view
@@ -331,7 +348,7 @@ contract SecurexPrivateV2 {
         return caseIds;
     }
 
-    /// @notice Retrieve a case’s primary information
+    // Function to get case details by ID
     function getCaseById(
         uint256 _caseId
     )
@@ -339,16 +356,16 @@ contract SecurexPrivateV2 {
         view
         atLeastAnalyst
         returns (
-            string memory,
-            uint256,
-            string memory,
-            string memory,
-            string memory,
-            string memory,
-            string memory,
-            string memory,
-            address,
-            uint256
+            string memory courtId,
+            uint256 caseId,
+            string memory caseDescription,
+            string memory caseType,
+            string memory petitioner,
+            string memory respondent,
+            string memory startDateTime,
+            string memory status,
+            address submittedBy,
+            uint256 totalEvidences
         )
     {
         require(cases[_caseId].initialised, "Case does not exist");
@@ -367,7 +384,7 @@ contract SecurexPrivateV2 {
         );
     }
 
-    /// @notice Retrieve specific evidence by case ID and evidence index
+    // Function to get evidence details by evidenceIndex
     function getEvidenceByIndex(
         uint256 _caseId,
         uint256 _evidenceIndex
@@ -392,9 +409,7 @@ contract SecurexPrivateV2 {
                 _evidenceIndex <= cases[_caseId].totalEvidences,
             "Invalid evidence index"
         );
-
         Evidence storage evd = cases[_caseId].evidences[_evidenceIndex];
-
         return (
             evd.evidenceId,
             evd.officerName,
@@ -407,7 +422,7 @@ contract SecurexPrivateV2 {
         );
     }
 
-    /// @notice Retrieve total number of evidences in a case
+    // Function to get total number of evidences in a case
     function getTotalEvidences(
         uint256 _caseId
     ) external view atLeastAnalyst returns (uint256) {

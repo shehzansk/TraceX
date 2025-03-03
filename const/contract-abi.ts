@@ -142,6 +142,43 @@ export const abi = [
       {
         "indexed": true,
         "internalType": "uint256",
+        "name": "evidenceId",
+        "type": "uint256"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "previousOwner",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "address",
+        "name": "newOwner",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "timestamp",
+        "type": "uint256"
+      }
+    ],
+    "name": "CustodyTransferred",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "uint256",
+        "name": "caseId",
+        "type": "uint256"
+      },
+      {
+        "indexed": true,
+        "internalType": "uint256",
         "name": "evidenceIndex",
         "type": "uint256"
       },
@@ -347,6 +384,29 @@ export const abi = [
     "type": "event"
   },
   {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "_caseId",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "_evidenceId",
+        "type": "uint256"
+      },
+      {
+        "internalType": "address",
+        "name": "_newOwner",
+        "type": "address"
+      }
+    ],
+    "name": "transferEvidenceCustody",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
     "inputs": [],
     "name": "admin",
     "outputs": [
@@ -495,52 +555,52 @@ export const abi = [
     "outputs": [
       {
         "internalType": "string",
-        "name": "",
+        "name": "courtId",
         "type": "string"
       },
       {
         "internalType": "uint256",
-        "name": "",
+        "name": "caseId",
         "type": "uint256"
       },
       {
         "internalType": "string",
-        "name": "",
+        "name": "caseDescription",
         "type": "string"
       },
       {
         "internalType": "string",
-        "name": "",
+        "name": "caseType",
         "type": "string"
       },
       {
         "internalType": "string",
-        "name": "",
+        "name": "petitioner",
         "type": "string"
       },
       {
         "internalType": "string",
-        "name": "",
+        "name": "respondent",
         "type": "string"
       },
       {
         "internalType": "string",
-        "name": "",
+        "name": "startDateTime",
         "type": "string"
       },
       {
         "internalType": "string",
-        "name": "",
+        "name": "status",
         "type": "string"
       },
       {
         "internalType": "address",
-        "name": "",
+        "name": "submittedBy",
         "type": "address"
       },
       {
         "internalType": "uint256",
-        "name": "",
+        "name": "totalEvidences",
         "type": "uint256"
       }
     ],

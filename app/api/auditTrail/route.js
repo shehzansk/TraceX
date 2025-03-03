@@ -20,10 +20,8 @@ export async function POST(request) {
         let auditTrail = await AuditTrail.findOne({ evidenceId });
 
         if (auditTrail) {
-            // Modify the actionType to 'EvidenceAltered' for all incoming actions
             const alteredActions = actions.map((action) => ({
-                ...action,
-                actionType: 'EvidenceAltered', // Overwrite actionType
+                ...action
             }));
 
             // Append new actions to existing audit trail
