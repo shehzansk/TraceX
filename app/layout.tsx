@@ -5,7 +5,8 @@ import { Providers } from "./providers";
 import Header from "@/components/header";
 import TopBar from "@/components/Topbar";
 import clsx from "clsx";
-import Chatbot from "../components/Chatbot";
+import { ChatbotProvider } from "../context/ChatbotContext";
+import ChatbotWindow from "../components/Chatbot";
 import { useEffect, useState } from 'react';
 import { useToast } from '@chakra-ui/react';
 import "@rainbow-me/rainbowkit/styles.css";
@@ -106,6 +107,7 @@ export default function RootLayout({
               clientId={process.env.THIRDWEB_CLIENT_ID as string}
             >
               <Providers>
+                <ChatbotProvider>
                 <div className="flex flex-col min-h-screen bg-white">
                   {/* Render Header and TopBar */}
                   <Header />
@@ -113,7 +115,8 @@ export default function RootLayout({
                   {/* Full-width main content */}
                   <main className="flex-grow">{children}</main>
                 </div>
-                 <Chatbot />
+                <ChatbotWindow />
+                </ChatbotProvider>
               </Providers>
             </ThirdwebProvider>
           </RainbowKitProvider>
