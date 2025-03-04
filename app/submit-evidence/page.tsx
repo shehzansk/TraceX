@@ -35,7 +35,22 @@ export default function SubmitEvidence() {
   const locationRef = useRef<HTMLInputElement>(null);
   const evidenceDescriptionRef = useRef<HTMLTextAreaElement>(null);
 
+  const generateRandomId = (): string => {
+    const digits = '0123456789';
+    let id = '';
+    for (let i = 0; i < 8; i++) {
+      id += digits[Math.floor(Math.random() * 10)];
+    }
+    return id;
+  };
+
   useEffect(() => {
+    const init = async () => {
+      await checkAccess();
+      setevdid();
+      getLocation();
+    };
+
     const checkAccess = async () => {
       try {
         const access = await isCollectorOrAdmin();
@@ -71,14 +86,19 @@ export default function SubmitEvidence() {
           },
           (error) => {
             console.error("Error getting location:", error);
-            // Handle permission denied or other errors by leaving location input empty
           }
         );
       }
     };
 
-    checkAccess();
-    getLocation();
+    const setevdid = () => {
+      if (evidenceIdRef.current) {
+        evidenceIdRef.current.value = generateRandomId();
+        evidenceIdRef.current.readOnly = true;
+      }
+    };
+
+    init();
   }, []);
 
   const { mutateAsync: upload } = useStorageUpload();
@@ -111,10 +131,10 @@ export default function SubmitEvidence() {
       }
 
       const evidenceId = parseInt(evidenceIdRef.current.value);
-      if (isNaN(evidenceId) || evidenceId < 100000 || evidenceId > 999999) {
+      if (isNaN(evidenceId) || evidenceId < 10000000 || evidenceId > 99999999) {
         toast({
           title: "Invalid Evidence ID",
-          description: "Evidence ID must be a 6-digit number.",
+          description: "Evidence ID must be a 8-digit number.",
           status: "error",
           duration: 5000,
           isClosable: true,
@@ -151,9 +171,12 @@ export default function SubmitEvidence() {
         setEvidenceType(0);
         // Do not reset officerName and location as they might remain the same
       } else {
+        let errorMsg = "An unknown error occurred.";
+        const match = response.error.match(/reason="([^"]+)"/);
+        errorMsg = match ? match[1] : response.error;
         toast({
-          title: "Failed to submit evidence.",
-          description: response.error || "An unknown error occurred.",
+          title: "Failed to transfer custody.",
+          description: errorMsg,
           status: "error",
           duration: 5000,
           isClosable: true,
@@ -204,7 +227,7 @@ export default function SubmitEvidence() {
         </FormControl>
 
         <FormControl id="evidenceId" mb={4} isRequired>
-          <FormLabel>Evidence ID (6-digit number)</FormLabel>
+          <FormLabel>Evidence ID (Pre-assigned)</FormLabel>
           <Input placeholder="Enter evidence ID" ref={evidenceIdRef} className="mb-4 w-full px-4 py-2 shadow-md rounded transition duration-200 ease-in-out hover:shadow-lg" />
         </FormControl>
 

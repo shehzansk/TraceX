@@ -2,6 +2,7 @@
 import { Colors } from "chart.js";
 import { useEffect, useState, useRef } from "react";
 import { ethers } from "ethers";
+import { AiOutlineCheckCircle } from 'react-icons/ai';
 import {
   Box,
   Heading,
@@ -83,6 +84,10 @@ export default function CaseDetails({ params }) {
   const [aiReport, setAiReport] = useState("");
   const [isTransferring, setIsTransferring] = useState(false);
   const [selectedEvidence, setSelectedEvidence] = useState(null);
+  const [tooltipVisible, setTooltipVisible] = useState(false);
+  const handleClick = () => {
+    setTooltipVisible(!tooltipVisible);
+  };
   const {
     isOpen: isAuditOpen,
     onOpen: onAuditOpen,
@@ -172,7 +177,19 @@ export default function CaseDetails({ params }) {
       }
     };
     fetchData();
-
+    const getLocation = () => {
+      if ("geolocation" in navigator && locationRef.current) {
+        navigator.geolocation.getCurrentPosition(
+          (position) => {
+            const coords = `${position.coords.latitude}, ${position.coords.longitude}`;
+            locationRef.current.value = coords;
+          },
+          (error) => {
+            console.error("Error getting location:", error);
+          }
+        );
+      }
+    };
     const fetchOfficerName = async () => {
       if (officerNameRef.current) {
         const signerAddress = (
@@ -187,20 +204,6 @@ export default function CaseDetails({ params }) {
     fetchOfficerName();
     getLocation();
   }, [caseId]);
-
-  const getLocation = () => {
-    if ("geolocation" in navigator && locationRef.current) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          const coords = `${position.coords.latitude}, ${position.coords.longitude}`;
-          locationRef.current.value = coords;
-        },
-        (error) => {
-          console.error("Error getting location:", error);
-        }
-      );
-    }
-  };
 
   const handleSearch = (e) => {
     const query = e.target.value.toLowerCase();
@@ -747,6 +750,12 @@ Instructions:
                   <a href={evidence.fileHash} target="_blank" rel="noopener noreferrer">
                     {evidence.fileHash}
                   </a>
+                  <span className="relative inline-block ml-1 group" onClick={handleClick}>
+                    <AiOutlineCheckCircle className="text-green-500 text-m cursor-pointer" />
+                    <span className={`absolute bottom-full left-1/2 transform -translate-x-1/2 mb-1 w-40 bg-black text-white text-center text-xs rounded py-1 transition-opacity duration-300 ${tooltipVisible ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}>
+                      Validated with EtherScan
+                    </span>
+                  </span>
                 </Text>
                 <Text>
                   <strong>Submitted By:</strong> {evidence.owner}
