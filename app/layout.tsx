@@ -5,6 +5,7 @@ import { Providers } from "./providers";
 import Header from "@/components/header";
 import TopBar from "@/components/Topbar";
 import clsx from "clsx";
+import Chatbot from "../components/Chatbot";
 import { useEffect, useState } from 'react';
 import { useToast } from '@chakra-ui/react';
 import "@rainbow-me/rainbowkit/styles.css";
@@ -112,6 +113,7 @@ export default function RootLayout({
                   {/* Full-width main content */}
                   <main className="flex-grow">{children}</main>
                 </div>
+                 <Chatbot />
               </Providers>
             </ThirdwebProvider>
           </RainbowKitProvider>
