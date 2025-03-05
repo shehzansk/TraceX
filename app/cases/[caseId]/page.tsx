@@ -2,7 +2,7 @@
 import { Colors } from "chart.js";
 import { useEffect, useState, useRef } from "react";
 import { ethers } from "ethers";
-import { AiOutlineCheckCircle } from 'react-icons/ai';
+import { AiOutlineCheckCircle } from "react-icons/ai";
 import {
   Box,
   Heading,
@@ -37,6 +37,9 @@ import {
   addEvidence,
   convertIPFSUriToUrl,
   getName,
+  updateCustodyChain,
+  signAuditAction,
+  getPendingApprovalForEvidence,
 } from "@/utils/helpers";
 import axios from "axios";
 import { Chart } from "react-chartjs-2";
@@ -54,9 +57,8 @@ import "chartjs-adapter-date-fns";
 import jsPDF from "jspdf";
 import { useStorageUpload } from "@thirdweb-dev/react";
 import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
-import { transferEvidenceCustody } from "@/utils/helpers";
 
-// Register the necessary Chart.js controllers/elements
+// Register necessary Chart.js components.
 ChartJS.register(
   CategoryScale,
   LinearScale,
@@ -71,23 +73,30 @@ ChartJS.register(
 export default function CaseDetails({ params }) {
   const router = useRouter();
   const { caseId } = params;
-  const [caseDetails, setCaseDetails] = useState(null);
-  const [evidences, setEvidences] = useState([]);
+  const toast = useToast();
+
+  // Essential states for error handling and loading.
   const [loading, setLoading] = useState(true);
   const [hasAccess, setHasAccess] = useState(false);
   const [canEdit, setCanEdit] = useState(false);
   const [error, setError] = useState("");
+
+  const [caseDetails, setCaseDetails] = useState(null);
+  const [evidences, setEvidences] = useState([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [filteredEvidences, setFilteredEvidences] = useState([]);
+
   const [auditTrail, setAuditTrail] = useState(null);
   const [auditLoading, setAuditLoading] = useState(false);
   const [aiReport, setAiReport] = useState("");
-  const [isTransferring, setIsTransferring] = useState(false);
-  const [selectedEvidence, setSelectedEvidence] = useState(null);
   const [tooltipVisible, setTooltipVisible] = useState(false);
-  const handleClick = () => {
-    setTooltipVisible(!tooltipVisible);
-  };
+
+  // For handling modals.
+  const {
+    isOpen: isEvidenceOpen,
+    onOpen: onEvidenceOpen,
+    onClose: onEvidenceClose,
+  } = useDisclosure();
   const {
     isOpen: isAuditOpen,
     onOpen: onAuditOpen,
@@ -99,15 +108,12 @@ export default function CaseDetails({ params }) {
     onClose: onReportClose,
   } = useDisclosure();
   const {
-    isOpen: isEvidenceOpen,
-    onOpen: onEvidenceOpen,
-    onClose: onEvidenceClose,
+    isOpen: isUpdateChainOpen,
+    onOpen: onUpdateChainOpen,
+    onClose: onUpdateChainClose,
   } = useDisclosure();
-  const { isOpen: isTransferOpen,
-    onOpen: onTransferOpen,
-    onClose: onTransferClose
-  } = useDisclosure();
-  const toast = useToast();
+
+  // For evidence submission.
   const [isSubmittingEvidence, setIsSubmittingEvidence] = useState(false);
   const [file, setFile] = useState([]);
   const [evidenceType, setEvidenceType] = useState(0);
@@ -115,35 +121,26 @@ export default function CaseDetails({ params }) {
   const officerNameRef = useRef(null);
   const locationRef = useRef(null);
   const evidenceDescriptionRef = useRef(null);
-  const newOwnerAddressRef = useRef(null);
 
-  const closeAllModals = () => {
-    onEvidenceClose();
-    onAuditClose();
-    onReportClose();
+  // For Update Custody Chain modal.
+  const [selectedUpdateEvidence, setSelectedUpdateEvidence] = useState(null);
+  const [updateActionType, setUpdateActionType] = useState("");
+  const [updateDescription, setUpdateDescription] = useState("");
+  const [updateReceiver, setUpdateReceiver] = useState("");
+  const [isSubmittingUpdate, setIsSubmittingUpdate] = useState(false);
+
+  // Store current user's wallet address and pending approval mapping.
+  const [currentUserAddress, setCurrentUserAddress] = useState("");
+  const [pendingApprovalMap, setPendingApprovalMap] = useState({});
+  // New state to correctly store the evidenceId for which the audit trail is being viewed.
+  const [selectedAuditEvidenceId, setSelectedAuditEvidenceId] = useState(0);
+
+  // Toggle the tooltip.
+  const handleClick = () => {
+    setTooltipVisible(!tooltipVisible);
   };
 
-  const openEvidenceModal = () => {
-    closeAllModals();
-    onEvidenceOpen();
-  };
-
-  const openAuditModal = () => {
-    closeAllModals();
-    onAuditOpen();
-  };
-
-  const openReportModal = () => {
-    closeAllModals();
-    onReportOpen();
-  };
-
-  const openTransferModal = (evidence) => {
-    closeAllModals();
-    setSelectedEvidence(evidence);
-    onTransferOpen();
-  };
-
+  // Initial data fetch, similar to original.
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -156,6 +153,7 @@ export default function CaseDetails({ params }) {
         }
         const editAccess = await isCollectorOrAdmin();
         setCanEdit(editAccess);
+        setFilteredEvidences([]); // Reset before load.
         const caseResponse = await getCaseById(caseId);
         const evidenceResponse = await getEvidences(caseId);
         if (caseResponse.status) {
@@ -177,6 +175,29 @@ export default function CaseDetails({ params }) {
       }
     };
     fetchData();
+
+    // Get current user's wallet address.
+    const fetchCurrentUser = async () => {
+      if (window.ethereum) {
+        const accounts = await window.ethereum.request({ method: "eth_accounts" });
+        if (accounts && accounts.length > 0) {
+          setCurrentUserAddress(accounts[0].toLowerCase());
+        }
+      }
+    };
+    fetchCurrentUser();
+
+    // Pre-fill officer name and location in evidence submission.
+    const fetchOfficerName = async () => {
+      if (officerNameRef.current && window.ethereum) {
+        const accounts = await window.ethereum.request({ method: "eth_accounts" });
+        const signerAddress = accounts[0];
+        const name = await getName(signerAddress);
+        if (name) {
+          officerNameRef.current.value = name;
+        }
+      }
+    };
     const getLocation = () => {
       if ("geolocation" in navigator && locationRef.current) {
         navigator.geolocation.getCurrentPosition(
@@ -190,21 +211,28 @@ export default function CaseDetails({ params }) {
         );
       }
     };
-    const fetchOfficerName = async () => {
-      if (officerNameRef.current) {
-        const signerAddress = (
-          await window.ethereum.request({ method: "eth_accounts" })
-        )[0];
-        const name = await getName(signerAddress);
-        if (name) {
-          officerNameRef.current.value = name;
-        }
-      }
-    };
     fetchOfficerName();
     getLocation();
   }, [caseId]);
 
+  // Load pending approvals for each evidence.
+  useEffect(() => {
+    const loadPendingApprovals = async () => {
+      if (!currentUserAddress || evidences.length === 0) return;
+      const map = {};
+      const promises = evidences.map(async (evidence) => {
+        const pending = await getPendingApprovalForEvidence(evidence.evidenceId, currentUserAddress);
+        if (pending) {
+          map[evidence.evidenceId] = pending;
+        }
+      });
+      await Promise.all(promises);
+      setPendingApprovalMap(map);
+    };
+    loadPendingApprovals();
+  }, [evidences, currentUserAddress]);
+
+  // Handler for search input.
   const handleSearch = (e) => {
     const query = e.target.value.toLowerCase();
     setSearchQuery(query);
@@ -217,13 +245,15 @@ export default function CaseDetails({ params }) {
     );
   };
 
+  // Fetch the audit trail for a given evidence.
   const fetchAuditTrail = async (evidenceId) => {
     try {
       setAuditLoading(true);
+      setSelectedAuditEvidenceId(evidenceId); // Save the evidenceId for later use.
       const response = await axios.get(`/api/auditTrail/${evidenceId}`);
       if (response.data.success) {
         setAuditTrail(response.data.data);
-        openAuditModal();
+        onAuditOpen();
       } else {
         toast({
           title: "Audit trail not found.",
@@ -246,12 +276,51 @@ export default function CaseDetails({ params }) {
     }
   };
 
+  // Generate AI report.
   const generateAIReport = async () => {
     try {
-      openReportModal();
+      onReportOpen();
       const caseData = { caseDetails, evidences };
-      const aiResponse = await generateAIReportContent(caseData);
-      setAiReport(aiResponse);
+      const prompt = `You are an AI assistant tasked with generating a comprehensive audit report for a legal case to be presented in Indian courts. Use the provided case details and evidence data to create a formal report.
+Case Details:
+Court ID: ${caseDetails.courtId}
+Case ID: ${caseDetails.caseId}
+Case Description: ${caseDetails.caseDescription}
+Case Type: ${caseDetails.caseType}
+Petitioner: ${caseDetails.petitioner}
+Respondent: ${caseDetails.respondent}
+Status: ${caseDetails.status}
+Start Date: ${caseDetails.startDateTime}
+Submitted By: ${caseDetails.submittedBy}
+Evidences:
+${evidences
+          .map(
+            (evidence) =>
+              `Evidence ID: ${evidence.evidenceId}
+Description: ${evidence.description}
+Officer Name: ${evidence.officerName}
+Location: ${evidence.location}
+Evidence Type: ${evidence.evidenceType}
+Timestamp: ${new Date(evidence.timestamp * 1000).toLocaleString()}`
+          )
+          .join("\n")}
+Instructions:
+- Summarize the case and its significance.
+- Detail each piece of evidence and its relevance.
+- Present findings in a logical, clear, and concise manner.
+- Use formal language suitable for a court presentation.
+- Ensure the report is organized with headings and sections.`;
+      const llm = new ChatGoogleGenerativeAI({
+        model: "gemini-1.5-pro",
+        temperature: 0,
+        apiKey: process.env.NEXT_PUBLIC_GOOGLE_API_KEY,
+      });
+      const response = await llm.invoke([{ role: "user", content: prompt }]);
+      const aiReportContent = response.content;
+      if (!aiReportContent) {
+        throw new Error("Failed to generate AI report.");
+      }
+      setAiReport(aiReportContent);
     } catch (err) {
       console.error(err);
       toast({
@@ -265,49 +334,6 @@ export default function CaseDetails({ params }) {
     }
   };
 
-  const generateAIReportContent = async (data) => {
-    const prompt = `You are an AI assistant tasked with generating a comprehensive audit report for a legal case to be presented in Indian courts. Use the provided case details and evidence data to create a formal report.
-Case Details:
-Court ID: ${data.caseDetails.courtId}
-Case ID: ${data.caseDetails.caseId}
-Case Description: ${data.caseDetails.caseDescription}
-Case Type: ${data.caseDetails.caseType}
-Petitioner: ${data.caseDetails.petitioner}
-Respondent: ${data.caseDetails.respondent}
-Status: ${data.caseDetails.status}
-Start Date: ${data.caseDetails.startDateTime}
-Submitted By: ${data.caseDetails.submittedBy}
-Evidences:
-${data.evidences
-        .map(
-          (evidence) =>
-            `Evidence ID: ${evidence.evidenceId}
-Description: ${evidence.description}
-Officer Name: ${evidence.officerName}
-Location: ${evidence.location}
-Evidence Type: ${evidence.evidenceType}
-Timestamp: ${new Date(evidence.timestamp * 1000).toLocaleString()}`
-        )
-        .join("\n")}
-Instructions:
-- Summarize the case and its significance.
-- Detail each piece of evidence and its relevance.
-- Present findings in a logical, clear, and concise manner.
-- Use formal language suitable for a court presentation.
-- Ensure the report is organized with headings and sections.`;
-    const llm = new ChatGoogleGenerativeAI({
-      model: "gemini-1.5-pro",
-      temperature: 0,
-      apiKey: process.env.NEXT_PUBLIC_GOOGLE_API_KEY,
-    });
-    const response = await llm.invoke([{ role: "user", content: prompt }]);
-    const aiReportContent = response.content;
-    if (!aiReportContent) {
-      throw new Error("Failed to generate AI report.");
-    }
-    return aiReportContent;
-  };
-
   const downloadPDF = () => {
     const doc = new jsPDF();
     doc.setFontSize(16);
@@ -318,52 +344,62 @@ Instructions:
     doc.save(`AI_Audit_Report_Case_${caseId}.pdf`);
   };
 
-  const handleCustodyTransfer = async () => {
-    setIsTransferring(true);
+  // Handler for the "Update Custody Chain" modal submission.
+  const handleUpdateChainSubmit = async () => {
+    setIsSubmittingUpdate(true);
     try {
-      if (!newOwnerAddressRef.current?.value) {
+      if (!selectedUpdateEvidence) {
+        throw new Error("No evidence selected.");
+      }
+      if (!updateActionType || !updateDescription) {
         toast({
-          title: "New owner address is required.",
+          title: "Please fill all required fields.",
           status: "error",
           duration: 5000,
           isClosable: true,
         });
-        setIsTransferring(false);
+        setIsSubmittingUpdate(false);
         return;
       }
-
-      const newOwnerAddress = newOwnerAddressRef.current.value.trim();
-
-      // Validate newOwnerAddress
-      if (!ethers.utils.isAddress(newOwnerAddress)) {
-        toast({
-          title: "Invalid owner address.",
-          status: "error",
-          duration: 5000,
-          isClosable: true,
-        });
-        setIsTransferring(false);
-        return;
+      let receiver = "";
+      if (updateActionType === "Custody transferred") {
+        if (!updateReceiver) {
+          toast({
+            title: "Receiver wallet address is required for custody transfer.",
+            status: "error",
+            duration: 5000,
+            isClosable: true,
+          });
+          setIsSubmittingUpdate(false);
+          return;
+        }
+        receiver = updateReceiver.trim();
       }
-
-      const transferResponse = await transferEvidenceCustody(
+      const response = await updateCustodyChain(
         caseId,
-        selectedEvidence.evidenceId, // Changed to evidenceId
-        newOwnerAddress
+        selectedUpdateEvidence.evidenceId,
+        updateActionType,
+        updateDescription,
+        receiver
       );
-
-      if (transferResponse.status) {
+      if (response.status) {
         toast({
-          title: "Custody transferred successfully.",
+          title: "Custody chain updated successfully.",
           status: "success",
           duration: 5000,
           isClosable: true,
         });
-        onTransferClose();
+        // Refresh evidences.
+        const evidenceResponse = await getEvidences(caseId);
+        if (evidenceResponse.status) {
+          setEvidences(evidenceResponse.evidences);
+          setFilteredEvidences(evidenceResponse.evidences);
+        }
+        onUpdateChainClose();
       } else {
         let errorMsg = "An unknown error occurred.";
-        const match = transferResponse.error.match(/reason="([^"]+)"/);
-        errorMsg = match ? match[1] : transferResponse.error;
+        const match = response.error.match(/reason="([^"]+)"/);
+        errorMsg = match ? match[1] : response.error;
         toast({
           title: "Failed to transfer custody.",
           description: errorMsg,
@@ -372,7 +408,7 @@ Instructions:
           isClosable: true,
         });
       }
-    } catch (err: any) {
+    } catch (err) {
       console.error(err);
       toast({
         title: "Error",
@@ -382,92 +418,39 @@ Instructions:
         isClosable: true,
       });
     } finally {
-      setIsTransferring(false);
+      setIsSubmittingUpdate(false);
     }
   };
 
-  // Build bubble chart data
-  let bubbleEvents = [];
-  if (caseDetails) {
-    bubbleEvents.push({
-      x: new Date(caseDetails.startDateTime),
-      y: 1,
-      r: 8,
-      label: "Case Registered",
-      type: "caseRegistered",
-    });
-  }
-  if (evidences.length > 0) {
-    const grouped = {};
-    evidences.forEach((evidence) => {
-      const day = new Date(evidence.timestamp * 1000).toDateString();
-      if (!grouped[day]) grouped[day] = [];
-      grouped[day].push(evidence);
-    });
-    const offset = 0.3;
-    Object.keys(grouped).forEach((day) => {
-      const eventsForDay = grouped[day];
-      eventsForDay.sort((a, b) => a.timestamp - b.timestamp);
-      const n = eventsForDay.length;
-      eventsForDay.forEach((evidence, index) => {
-        const y = 1 + (index - (n - 1) / 2) * offset;
-        bubbleEvents.push({
-          x: new Date(evidence.timestamp * 1000),
-          y: y,
-          r: 8,
-          label: `Evidence ID: ${evidence.evidenceId}`,
-          description: evidence.description,
-          officerName: evidence.officerName,
-          location: evidence.location,
-          type: "evidence",
+  // Handler for digitally signing an audit action using its transactionHash.
+  const handleSignAuditAction = async (transactionHash) => {
+    try {
+      const response = await signAuditAction(
+        selectedAuditEvidenceId,
+        transactionHash,
+        currentUserAddress
+      );
+      if (response.status) {
+        toast({
+          title: "Audit action approved successfully.",
+          status: "success",
+          duration: 5000,
+          isClosable: true,
         });
-      });
-    });
-  }
-  const bubbleData = {
-    datasets: [
-      {
-        label: "Case Timeline",
-        data: bubbleEvents,
-      },
-    ],
-  };
-
-  const bubbleOptions = {
-    responsive: true,
-    maintainAspectRatio: false,
-    scales: {
-      x: {
-        type: "time",
-        time: { unit: "day" },
-        title: { display: true, text: "Date" },
-      },
-      y: { display: false },
-    },
-    plugins: {
-      colors: { forceOverride: true },
-      tooltip: {
-        callbacks: {
-          label: function (context) {
-            const dataPoint = context.raw;
-            if (dataPoint.type === "caseRegistered") {
-              return [
-                dataPoint.label,
-                `Date: ${new Date(dataPoint.x).toLocaleString()}`,
-              ];
-            }
-            return [
-              dataPoint.label,
-              `Description: ${dataPoint.description}`,
-              `Officer: ${dataPoint.officerName}`,
-              `Location: ${dataPoint.location}`,
-              `Date: ${new Date(dataPoint.x).toLocaleString()}`,
-            ];
-          },
-        },
-      },
-      legend: { display: true },
-    },
+        // Refresh the audit trail after signing.
+        fetchAuditTrail(selectedAuditEvidenceId);
+      } else {
+        toast({
+          title: "Failed to approve audit action.",
+          description: response.error || "An unknown error occurred.",
+          status: "error",
+          duration: 5000,
+          isClosable: true,
+        });
+      }
+    } catch (err) {
+      console.error(err);
+    }
   };
 
   const { mutateAsync: upload } = useStorageUpload();
@@ -558,26 +541,97 @@ Instructions:
     }
   };
 
+  let bubbleEvents = [];
+  if (caseDetails) {
+    bubbleEvents.push({
+      x: new Date(caseDetails.startDateTime),
+      y: 1,
+      r: 8,
+      label: "Case Registered",
+      type: "caseRegistered",
+    });
+  }
+  if (evidences.length > 0) {
+    const grouped = {};
+    evidences.forEach((evidence) => {
+      const day = new Date(evidence.timestamp * 1000).toDateString();
+      if (!grouped[day]) grouped[day] = [];
+      grouped[day].push(evidence);
+    });
+    const offset = 0.3;
+    Object.keys(grouped).forEach((day) => {
+      const eventsForDay = grouped[day];
+      eventsForDay.sort((a, b) => a.timestamp - b.timestamp);
+      const n = eventsForDay.length;
+      eventsForDay.forEach((evidence, index) => {
+        const y = 1 + (index - (n - 1) / 2) * offset;
+        bubbleEvents.push({
+          x: new Date(evidence.timestamp * 1000),
+          y: y,
+          r: 8,
+          label: `Evidence ID: ${evidence.evidenceId}`,
+          description: evidence.description,
+          officerName: evidence.officerName,
+          location: evidence.location,
+          type: "evidence",
+        });
+      });
+    });
+  }
+  const bubbleData = {
+    datasets: [
+      {
+        label: "Case Timeline",
+        data: bubbleEvents,
+      },
+    ],
+  };
+
+  const bubbleOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    scales: {
+      x: {
+        type: "time",
+        time: { unit: "day" },
+        title: { display: true, text: "Date" },
+      },
+      y: { display: false },
+    },
+    plugins: {
+      colors: { forceOverride: true },
+      tooltip: {
+        callbacks: {
+          label: function (context) {
+            const dataPoint = context.raw;
+            if (dataPoint.type === "caseRegistered") {
+              return [dataPoint.label, `Date: ${new Date(dataPoint.x).toLocaleString()}`];
+            }
+            return [
+              dataPoint.label,
+              `Description: ${dataPoint.description}`,
+              `Officer: ${dataPoint.officerName}`,
+              `Location: ${dataPoint.location}`,
+              `Date: ${new Date(dataPoint.x).toLocaleString()}`,
+            ];
+          },
+        },
+      },
+      legend: { display: true },
+    },
+  };
+
+  // Render loading or access error screens.
   if (loading) {
     return (
-      <Box
-        minH="100vh"
-        display="flex"
-        alignItems="center"
-        justifyContent="center"
-      >
+      <Box minH="100vh" display="flex" alignItems="center" justifyContent="center">
         <Spinner size="xl" />
       </Box>
     );
   }
   if (!hasAccess) {
     return (
-      <Box
-        minH="100vh"
-        display="flex"
-        alignItems="center"
-        justifyContent="center"
-      >
+      <Box minH="100vh" display="flex" alignItems="center" justifyContent="center">
         <Alert status="error">
           <AlertIcon />
           {error || "You do not have permission to view this page."}
@@ -587,13 +641,7 @@ Instructions:
   }
 
   return (
-    <Box
-      minH="100vh"
-      pt={["4", "8", "12"]}
-      px={["4", "6", "8"]}
-      maxW="7xl"
-      mx="auto"
-    >
+    <Box minH="100vh" pt={["4", "8", "12"]} px={["4", "6", "8"]} maxW="7xl" mx="auto">
       <Heading as="h1" size={["lg", "xl"]} mb={[2, 6]}>
         Case Details (ID: {caseId})
       </Heading>
@@ -621,8 +669,7 @@ Instructions:
                 <strong>Status:</strong> {caseDetails.status}
               </Text>
               <Text>
-                <strong>Start Date:</strong>{" "}
-                {new Date(caseDetails.startDateTime).toLocaleDateString()}
+                <strong>Start Date:</strong> {new Date(caseDetails.startDateTime).toLocaleDateString()}
               </Text>
               <Text>
                 <strong>Submitted By:</strong> {caseDetails.submittedBy}
@@ -634,7 +681,7 @@ Instructions:
               Generate AI Audit Report
             </Button>
             {canEdit && (
-              <Button colorScheme="teal" onClick={openEvidenceModal} size={["sm", "md"]}>
+              <Button colorScheme="teal" onClick={onEvidenceOpen} size={["sm", "md"]}>
                 + Add Evidence
               </Button>
             )}
@@ -652,50 +699,7 @@ Instructions:
             Case Timeline
           </Heading>
           {bubbleEvents.length > 0 ? (
-            <Chart
-              style={{ height: "100%" }}
-              type="bubble"
-              data={bubbleData}
-              options={{
-                responsive: true,
-                maintainAspectRatio: false,
-                layout: {
-                  padding: { top: 10, bottom: 20, left: 10, right: 10 },
-                },
-                scales: {
-                  x: {
-                    type: "time",
-                    time: { unit: "day" },
-                    title: { display: true, text: "Date" },
-                  },
-                  y: { display: false },
-                },
-                plugins: {
-                  colors: { forceOverride: true },
-                  tooltip: {
-                    callbacks: {
-                      label: function (context) {
-                        const dataPoint = context.raw;
-                        if (dataPoint.type === "caseRegistered") {
-                          return [
-                            dataPoint.label,
-                            `Date: ${new Date(dataPoint.x).toLocaleString()}`,
-                          ];
-                        }
-                        return [
-                          dataPoint.label,
-                          `Description: ${dataPoint.description}`,
-                          `Officer: ${dataPoint.officerName}`,
-                          `Location: ${dataPoint.location}`,
-                          `Date: ${new Date(dataPoint.x).toLocaleString()}`,
-                        ];
-                      },
-                    },
-                  },
-                  legend: { display: true },
-                },
-              }}
-            />
+            <Chart style={{ height: "100%" }} type="bubble" data={bubbleData} options={bubbleOptions} />
           ) : (
             <Text>No evidences to display in the timeline.</Text>
           )}
@@ -736,8 +740,7 @@ Instructions:
                   <strong>Description:</strong> {evidence.description}
                 </Text>
                 <Text>
-                  <strong>Date:</strong>{" "}
-                  {new Date(evidence.timestamp * 1000).toLocaleString()}
+                  <strong>Date:</strong> {new Date(evidence.timestamp * 1000).toLocaleString()}
                 </Text>
                 <Text>
                   <strong>Officer Name:</strong> {evidence.officerName}
@@ -752,7 +755,7 @@ Instructions:
                   </a>
                   <span className="relative inline-block ml-1 group" onClick={handleClick}>
                     <AiOutlineCheckCircle className="text-green-500 text-m cursor-pointer" />
-                    <span className={`absolute bottom-full left-1/2 transform -translate-x-1/2 mb-1 w-40 bg-black text-white text-center text-xs rounded py-1 transition-opacity duration-300 ${tooltipVisible ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}>
+                    <span className={`absolute bottom-full left-1/2 transform -translate-x-1/2 mb-1 w-40 bg-black text-white text-center text-xs rounded py-1 transition-opacity duration-300 ${tooltipVisible ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`}>
                       Validated with EtherScan
                     </span>
                   </span>
@@ -760,18 +763,25 @@ Instructions:
                 <Text>
                   <strong>Submitted By:</strong> {evidence.owner}
                 </Text>
-
-                {/* Updated HStack for centered, responsive buttons */}
-                <HStack
-                  spacing={["2", "4"]}
-                  justify={["center", "flex-end"]}
-                  mt={5}
-                  mb={4}
-                  wrap={["wrap", "nowrap"]}
-                >
+                {pendingApprovalMap[evidence.evidenceId] && (
+                  <Text color="red" fontSize="sm" fontWeight="bold">
+                    Approval Pending for Transfer
+                  </Text>
+                )}
+                <HStack spacing={["2", "4"]} justify={["center", "flex-end"]} mt={5} mb={4} wrap={["wrap", "nowrap"]}>
                   {canEdit && (
-                    <Button colorScheme="purple" size={["sm", "md"]} onClick={() => openTransferModal(evidence)}>
-                      Transfer Custody
+                    <Button
+                      colorScheme="purple"
+                      size={["sm", "md"]}
+                      onClick={() => {
+                        setSelectedUpdateEvidence(evidence);
+                        setUpdateActionType("");
+                        setUpdateDescription("");
+                        setUpdateReceiver("");
+                        onUpdateChainOpen();
+                      }}
+                    >
+                      Update Custody Chain
                     </Button>
                   )}
                   <Button
@@ -796,13 +806,12 @@ Instructions:
               </Box>
             ))}
           </VStack>
-
         ) : (
           <Text>No evidences found.</Text>
         )}
       </Box>
 
-      {/* Evidence Modal */}
+      {/* Evidence Submission Modal */}
       <Modal isOpen={isEvidenceOpen} onClose={onEvidenceClose} size="xl">
         <ModalOverlay />
         <ModalContent>
@@ -854,11 +863,7 @@ Instructions:
             </FormControl>
           </ModalBody>
           <ModalFooter>
-            <Button
-              colorScheme="teal"
-              isLoading={isSubmittingEvidence}
-              onClick={handleAddEvidence}
-            >
+            <Button colorScheme="teal" isLoading={isSubmittingEvidence} onClick={handleAddEvidence}>
               Submit Evidence
             </Button>
             <Button variant="ghost" onClick={onEvidenceClose}>
@@ -879,31 +884,40 @@ Instructions:
               <Spinner />
             ) : auditTrail ? (
               <Box>
-                <Text>
-                  <strong>Evidence ID:</strong> {auditTrail.evidenceId}
-                </Text>
+                <Text><strong>Evidence ID:</strong> {auditTrail.evidenceId}</Text>
                 <VStack spacing={3} align="stretch" mt={4}>
                   {auditTrail.actions.map((action, index) => (
                     <Box key={index} p={3} borderWidth="1px" borderRadius="md">
-                      <Text>
-                        <strong>Action Type:</strong> {action.actionType}
-                      </Text>
-                      <Text>
-                        <strong>User Address:</strong> {action.userAddress}
-                      </Text>
-                      <Text>
-                        <strong>Timestamp:</strong>{' '}
-                        {new Date(action.timestamp).toLocaleString()}
-                      </Text>
-                      <Text>
-                        <strong>Details:</strong> {action.details}
-                      </Text>
-                      <Text>
-                        <strong>Transaction Hash:</strong> {action.transactionHash}
-                      </Text>
-                      <Text>
-                        <strong>Block Number:</strong> {action.blockNumber}
-                      </Text>
+                      <Text><strong>Action Type:</strong> {action.actionType}</Text>
+                      <Text><strong>User Address:</strong> {action.userAddress}</Text>
+                      <Text><strong>Timestamp:</strong> {new Date(action.timestamp).toLocaleString()}</Text>
+                      <Text><strong>Details:</strong> {action.details}</Text>
+                      <Text><strong>Transaction Hash:</strong> {action.transactionHash}</Text>
+                      <Text><strong>Block Number:</strong> {action.blockNumber}</Text>
+                      {action.actionType === "Custody transferred" && action.approval && (
+                        <>
+                          {action.approval.pending ? (
+                            <>
+                              <Text color="red.500" fontSize="sm">
+                                This transaction was not digitally signed
+                              </Text>
+                              {currentUserAddress === action.approval.receiver.toLowerCase() && (
+                                <Button
+                                  colorScheme="blue"
+                                  size="sm"
+                                  onClick={() => handleSignAuditAction(action.transactionHash)}
+                                >
+                                  Digitally Sign
+                                </Button>
+                              )}
+                            </>
+                          ) : (
+                            <Text color="green.500" fontSize="sm">
+                              This transaction was approved by {action.approval.approvedBy}<br />at {action.approval.approvedAt}
+                            </Text>
+                          )}
+                        </>
+                      )}
                     </Box>
                   ))}
                 </VStack>
@@ -941,27 +955,59 @@ Instructions:
         </ModalContent>
       </Modal>
 
-      {/* Transfer Custody Modal */}
-      <Modal isOpen={isTransferOpen} onClose={onTransferClose}>
+      {/* Update Custody Chain Modal */}
+      <Modal isOpen={isUpdateChainOpen} onClose={onUpdateChainClose} size="xl">
         <ModalOverlay />
         <ModalContent>
-          <ModalHeader>Transfer Custody</ModalHeader>
+          <ModalHeader>Update Custody Chain</ModalHeader>
           <ModalCloseButton />
           <ModalBody>
-            <FormControl isRequired>
-              <FormLabel>New Owner Wallet Address</FormLabel>
-              <Input ref={newOwnerAddressRef} placeholder="0x..." />
+            <FormControl id="updateActionType" mb={4} isRequired>
+              <FormLabel>Action Type</FormLabel>
+              <Select
+                placeholder="Select action type"
+                value={updateActionType}
+                onChange={(e) => setUpdateActionType(e.target.value)}
+              >
+                <option value="Analysis updated">Analysis updated</option>
+                <option value="Custody transferred">Custody transferred</option>
+                <option value="Evidence Archived">Evidence Archived</option>
+              </Select>
             </FormControl>
+            <FormControl id="updateDescription" mb={4} isRequired>
+              <FormLabel>Action Description</FormLabel>
+              <Textarea
+                placeholder="Enter description for the action"
+                value={updateDescription}
+                onChange={(e) => setUpdateDescription(e.target.value)}
+              />
+            </FormControl>
+            {updateActionType === "Custody transferred" && (
+              <>
+                <Text color="red" mb={2}>
+                  Approval required for validating this action
+                </Text>
+                <FormControl id="updateReceiver" mb={4} isRequired>
+                  <FormLabel>Receiver Wallet Address</FormLabel>
+                  <Input
+                    placeholder="0x..."
+                    value={updateReceiver}
+                    onChange={(e) => setUpdateReceiver(e.target.value)}
+                  />
+                </FormControl>
+              </>
+            )}
           </ModalBody>
           <ModalFooter>
-            <Button colorScheme="blue" mr={3} onClick={handleCustodyTransfer} isLoading={isTransferring}>
-              Transfer
+            <Button colorScheme="teal" isLoading={isSubmittingUpdate} onClick={handleUpdateChainSubmit}>
+              Submit
             </Button>
-            <Button variant="ghost" onClick={onTransferClose}>Cancel</Button>
+            <Button variant="ghost" onClick={onUpdateChainClose}>
+              Cancel
+            </Button>
           </ModalFooter>
         </ModalContent>
       </Modal>
     </Box>
   );
-
 }

@@ -38,7 +38,7 @@ export default function SubmitEvidence() {
   const generateRandomId = (): string => {
     const digits = '0123456789';
     let id = '';
-    for (let i = 0; i < 8; i++) {
+    for (let i = 0; i < 6; i++) {
       id += digits[Math.floor(Math.random() * 10)];
     }
     return id;
@@ -131,10 +131,10 @@ export default function SubmitEvidence() {
       }
 
       const evidenceId = parseInt(evidenceIdRef.current.value);
-      if (isNaN(evidenceId) || evidenceId < 10000000 || evidenceId > 99999999) {
+      if (isNaN(evidenceId) || evidenceId < 100000 || evidenceId > 999999) {
         toast({
           title: "Invalid Evidence ID",
-          description: "Evidence ID must be a 8-digit number.",
+          description: "Evidence ID must be a 6-digit number.",
           status: "error",
           duration: 5000,
           isClosable: true,

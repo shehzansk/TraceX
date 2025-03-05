@@ -20,14 +20,10 @@ export async function POST(request) {
         let auditTrail = await AuditTrail.findOne({ evidenceId });
 
         if (auditTrail) {
-            const alteredActions = actions.map((action) => ({
-                ...action
-            }));
-
             // Append new actions to existing audit trail
-            auditTrail.actions.push(...alteredActions);
+            auditTrail.actions.push(...actions);
         } else {
-            // For new evidence, actionType remains as provided
+            // For new evidence, create new audit trail document
             auditTrail = new AuditTrail({ evidenceId, actions });
         }
 
@@ -38,4 +34,3 @@ export async function POST(request) {
         return NextResponse.json({ success: false, error: error.message }, { status: 500 });
     }
 }
-

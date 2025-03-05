@@ -29,6 +29,7 @@ import {
   useDisclosure,
   useToast,
   HStack,
+  SimpleGrid,
 } from "@chakra-ui/react";
 import { useRouter } from "next/navigation";
 import {
@@ -37,23 +38,37 @@ import {
   isAtLeastAnalyst,
   isCollectorOrAdmin,
   getCaseById,
+  getName,
 } from "@/utils/helpers";
 import { ethers } from "ethers";
 
 export default function CasesList() {
+  // Main data states
   const [cases, setCases] = useState<any[]>([]);
   const [filteredCases, setFilteredCases] = useState<any[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [hasAccess, setHasAccess] = useState<boolean>(false);
   const [canEdit, setCanEdit] = useState<boolean>(false);
   const [error, setError] = useState<string>("");
-  const [searchQuery, setSearchQuery] = useState<string>("");
+
+  // Advanced filter states
+  const [descriptionQuery, setDescriptionQuery] = useState<string>("");
+  const [petitionerQuery, setPetitionerQuery] = useState<string>("");
+  const [respondentQuery, setRespondentQuery] = useState<string>("");
+  const [courtIdFilter, setCourtIdFilter] = useState<string>("");
+  const [caseTypeFilter, setCaseTypeFilter] = useState<string>(""); // New filter for case type
+  const [statusFilter, setStatusFilter] = useState<string>("");
+  const [submittedByQuery, setSubmittedByQuery] = useState<string>("");
+  const [dateFrom, setDateFrom] = useState<string>("");
+  const [dateTo, setDateTo] = useState<string>("");
+
   const [selectedCaseId, setSelectedCaseId] = useState<number | null>(null);
   const [newStatus, setNewStatus] = useState<string>("");
   const { isOpen, onOpen, onClose } = useDisclosure();
   const toast = useToast();
   const router = useRouter();
 
+  // Fetch and enrich cases with submittedByName using getName.
   useEffect(() => {
     const fetchCases = async () => {
       try {
@@ -71,8 +86,19 @@ export default function CasesList() {
         const response = await getAllCases();
 
         if (response.status) {
-          setCases(response.cases);
-          setFilteredCases(response.cases);
+          // Enrich each case with the associated submittedBy name.
+          const enrichedCases = await Promise.all(
+            response.cases.map(async (caseItem: any) => {
+              try {
+                const name = await getName(caseItem.submittedBy);
+                return { ...caseItem, submittedByName: name };
+              } catch (e) {
+                return { ...caseItem, submittedByName: "" };
+              }
+            })
+          );
+          setCases(enrichedCases);
+          setFilteredCases(enrichedCases);
         } else {
           setError(response.error || "Failed to fetch cases.");
         }
@@ -87,18 +113,95 @@ export default function CasesList() {
     fetchCases();
   }, []);
 
+  // Apply incremental, case-insensitive filtering
+  useEffect(() => {
+    const filtered = cases.filter((caseItem) => {
+      let match = true;
+
+      // Description filter
+      if (
+        descriptionQuery &&
+        !caseItem.caseDescription.toLowerCase().includes(descriptionQuery)
+      )
+        match = false;
+
+      // Petitioner filter
+      if (
+        petitionerQuery &&
+        !caseItem.petitioner.toLowerCase().includes(petitionerQuery)
+      )
+        match = false;
+
+      // Respondent filter
+      if (
+        respondentQuery &&
+        !caseItem.respondent.toLowerCase().includes(respondentQuery)
+      )
+        match = false;
+
+      // Court ID filter: incremental matching (e.g. "98" will match "988")
+      if (
+        courtIdFilter &&
+        !caseItem.courtId.toString().includes(courtIdFilter)
+      )
+        match = false;
+
+      // Case Type filter: incremental and case-insensitive
+      if (
+        caseTypeFilter &&
+        !caseItem.caseType.toLowerCase().includes(caseTypeFilter)
+      )
+        match = false;
+
+      // Status filter: since it is a dropdown we do exact match (case insensitive)
+      if (
+        statusFilter &&
+        caseItem.status.toLowerCase() !== statusFilter.toLowerCase()
+      )
+        match = false;
+
+      // Submitted By filter: check against account address and name
+      if (submittedByQuery) {
+        const submittedAddr = caseItem.submittedBy.toLowerCase();
+        const submittedName = (caseItem.submittedByName || "").toLowerCase();
+        if (
+          !submittedAddr.includes(submittedByQuery) &&
+          !submittedName.includes(submittedByQuery)
+        )
+          match = false;
+      }
+
+      // Date range filtering based on start date
+      if (dateFrom) {
+        const caseDate = new Date(caseItem.startDateTime);
+        const from = new Date(dateFrom);
+        if (caseDate < from) match = false;
+      }
+
+      if (dateTo) {
+        const caseDate = new Date(caseItem.startDateTime);
+        const to = new Date(dateTo);
+        if (caseDate > to) match = false;
+      }
+
+      return match;
+    });
+    setFilteredCases(filtered);
+  }, [
+    cases,
+    descriptionQuery,
+    petitionerQuery,
+    respondentQuery,
+    courtIdFilter,
+    caseTypeFilter,
+    statusFilter,
+    submittedByQuery,
+    dateFrom,
+    dateTo,
+  ]);
+
   const handleViewCase = (caseId: number) => {
     router.push(`/cases/${caseId}`);
-  };
-
-  const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const query = e.target.value.toLowerCase();
-    setSearchQuery(query);
-    setFilteredCases(
-      cases.filter((caseItem) =>
-        caseItem.caseDescription.toLowerCase().includes(query)
-      )
-    );
   };
 
   const handleChangeStatus = (caseId: number) => {
@@ -129,18 +232,13 @@ export default function CasesList() {
           duration: 5000,
           isClosable: true,
         });
-        // Update the case status locally
+        // Update the case status locally.
         const updatedCases = cases.map((caseItem) =>
           caseItem.caseId === selectedCaseId
             ? { ...caseItem, status: newStatus }
             : caseItem
         );
         setCases(updatedCases);
-        setFilteredCases(
-          updatedCases.filter((caseItem) =>
-            caseItem.caseDescription.toLowerCase().includes(searchQuery)
-          )
-        );
         setNewStatus("");
         setSelectedCaseId(null);
         onClose();
@@ -215,20 +313,119 @@ export default function CasesList() {
       <Heading as="h1" size={["lg", "xl"]} mb={6}>
         Registered Cases
       </Heading>
-      <Input
-        placeholder="Search cases by description..."
-        value={searchQuery}
-        onChange={handleSearch}
-        mb={4}
-        px={["2", "4"]}
-        py={["2", "3"]}
-        shadow="md"
-        rounded="md"
-        transition="all 0.2s"
-        _hover={{ shadow: "lg", borderColor: "blue.500" }}
-      />
 
-      {/* Wrap the table in an overflow container for mobile devices */}
+      {/* Advanced Filters */}
+      <Box p={4} mb={6} borderWidth="1px" borderRadius="md">
+        <Heading as="h2" size="md" mb={4}>
+          Advanced Filters
+        </Heading>
+        <SimpleGrid columns={[1, 2, 3]} spacing={4}>
+          <FormControl>
+            <FormLabel>Description</FormLabel>
+            <Input
+              placeholder="Search description"
+              value={descriptionQuery}
+              onChange={(e) =>
+                setDescriptionQuery(e.target.value.toLowerCase())
+              }
+            />
+          </FormControl>
+          <FormControl>
+            <FormLabel>Petitioner</FormLabel>
+            <Input
+              placeholder="Search petitioner"
+              value={petitionerQuery}
+              onChange={(e) =>
+                setPetitionerQuery(e.target.value.toLowerCase())
+              }
+            />
+          </FormControl>
+          <FormControl>
+            <FormLabel>Respondent</FormLabel>
+            <Input
+              placeholder="Search respondent"
+              value={respondentQuery}
+              onChange={(e) =>
+                setRespondentQuery(e.target.value.toLowerCase())
+              }
+            />
+          </FormControl>
+          <FormControl>
+            <FormLabel>Court ID</FormLabel>
+            <Input
+              placeholder="Filter by court id"
+              value={courtIdFilter}
+              onChange={(e) => setCourtIdFilter(e.target.value)}
+            />
+          </FormControl>
+          <FormControl>
+            <FormLabel>Case Type</FormLabel>
+            <Input
+              placeholder="Filter by case type"
+              value={caseTypeFilter}
+              onChange={(e) => setCaseTypeFilter(e.target.value.toLowerCase())}
+            />
+          </FormControl>
+          <FormControl>
+            <FormLabel>Status</FormLabel>
+            <Select
+              placeholder="Filter by status"
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+            >
+              <option value="Open">Open</option>
+              <option value="Under Investigation">
+                Under Investigation
+              </option>
+              <option value="Closed">Closed</option>
+            </Select>
+          </FormControl>
+          <FormControl>
+            <FormLabel>Submitted By</FormLabel>
+            <Input
+              placeholder="Name or address"
+              value={submittedByQuery}
+              onChange={(e) =>
+                setSubmittedByQuery(e.target.value.toLowerCase())
+              }
+            />
+          </FormControl>
+          <FormControl>
+            <FormLabel>Date From</FormLabel>
+            <Input
+              type="date"
+              value={dateFrom}
+              onChange={(e) => setDateFrom(e.target.value)}
+            />
+          </FormControl>
+          <FormControl>
+            <FormLabel>Date To</FormLabel>
+            <Input
+              type="date"
+              value={dateTo}
+              onChange={(e) => setDateTo(e.target.value)}
+            />
+          </FormControl>
+        </SimpleGrid>
+        <Button
+          mt={4}
+          onClick={() => {
+            setDescriptionQuery("");
+            setPetitionerQuery("");
+            setRespondentQuery("");
+            setCourtIdFilter("");
+            setCaseTypeFilter("");
+            setStatusFilter("");
+            setSubmittedByQuery("");
+            setDateFrom("");
+            setDateTo("");
+          }}
+        >
+          Reset Filters
+        </Button>
+      </Box>
+
+      {/* Cases Table */}
       <Box overflowX="auto">
         <Table variant="simple">
           <Thead>
@@ -236,7 +433,7 @@ export default function CasesList() {
               <Th>Case ID</Th>
               <Th>Court ID</Th>
               <Th>Case Type</Th>
-              <Th>Case Description</Th>
+              <Th>Description</Th>
               <Th>Status</Th>
               <Th>Submitted By</Th>
               <Th>Action</Th>
@@ -249,10 +446,17 @@ export default function CasesList() {
                 <Td>{caseItem.courtId}</Td>
                 <Td>{caseItem.caseType}</Td>
                 <Td>
-                  {caseItem.caseDescription.split(" ").slice(0, 5).join(" ")}...
+                  {caseItem.caseDescription.split(" ")
+                    .slice(0, 5)
+                    .join(" ")}
+                  ...
                 </Td>
                 <Td>{caseItem.status}</Td>
-                <Td>{caseItem.submittedBy}</Td>
+                <Td>
+                  {caseItem.submittedByName
+                    ? `${caseItem.submittedByName} (${caseItem.submittedBy})`
+                    : caseItem.submittedBy}
+                </Td>
                 <Td>
                   <HStack spacing={["2", "4"]} wrap="wrap">
                     <Button
@@ -294,7 +498,9 @@ export default function CasesList() {
                 onChange={(e) => setNewStatus(e.target.value)}
               >
                 <option value="Open">Open</option>
-                <option value="Under Investigation">Under Investigation</option>
+                <option value="Under Investigation">
+                  Under Investigation
+                </option>
                 <option value="Closed">Closed</option>
               </Select>
             </FormControl>
@@ -318,3 +524,4 @@ export default function CasesList() {
     </Box>
   );
 }
+

@@ -109,7 +109,7 @@ export default function ChatbotWindow() {
         ${isChatbotOpen ? "translate-y-0 opacity-100" : "translate-y-full opacity-0 pointer-events-none"}`}
     >
       {/* Chat Header */}
-      <div className="bg-blue-600 text-white p-3 flex justify-between items-center">
+      <div className="bg-blue-900 text-white p-3 flex justify-between items-center">
         <div className="flex items-center gap-2">
           <Image
             src="/chatbot-robot.png"
@@ -137,11 +137,10 @@ export default function ChatbotWindow() {
             {messages.map((msg, index) => (
               <div key={index} className={`mb-4 flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
                 <div
-                  className={`max-w-[80%] p-3 rounded-lg ${
-                    msg.role === "user"
-                      ? "bg-blue-600 text-white rounded-tr-none"
-                      : "bg-gray-200 text-black rounded-tl-none"
-                  }`}
+                  className={`max-w-[80%] p-3 rounded-lg ${msg.role === "user"
+                    ? "bg-blue-600 text-white rounded-tr-none"
+                    : "bg-gray-200 text-black rounded-tl-none"
+                    }`}
                 >
                   {msg.content}
                 </div>
@@ -174,9 +173,8 @@ export default function ChatbotWindow() {
               <button
                 onClick={handleSend}
                 disabled={isLoading || !input.trim()}
-                className={`absolute right-2 top-1/2 transform -translate-y-1/2 transition-colors duration-300 ${
-                  !input.trim() ? "text-gray-400" : "text-blue-600 hover:text-blue-800"
-                }`}
+                className={`absolute right-2 top-1/2 transform -translate-y-1/2 transition-colors duration-300 ${!input.trim() ? "text-gray-400" : "text-blue-600 hover:text-blue-800"
+                  }`}
               >
                 <Send size={20} />
               </button>

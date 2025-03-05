@@ -458,6 +458,113 @@ export const transferEvidenceCustody = async (
   }
 };
 
+// New function: updateCustodyChain
+export const updateCustodyChain = async (
+  caseId: number,
+  evidenceId: number,
+  actionType: string,
+  details: string,
+  receiverAddress?: string
+) => {
+  try {
+    if (!ethereumService.contract || !ethereumService.signer) {
+      await ethereumService.initialize();
+    }
+    const signer = ethereumService.signer!;
+    const contract = ethereumService.contract!;
+    let receipt = null;
+    if (actionType === "Custody transferred") {
+      if (!receiverAddress || !ethers.utils.isAddress(receiverAddress)) {
+        throw new Error("Invalid new owner address");
+      }
+      const tx = await contract.transferEvidenceCustody(caseId, evidenceId, receiverAddress);
+      receipt = await tx.wait();
+    }
+    // Construct audit action
+    const auditAction: any = {
+      actionType,
+      timestamp: new Date(),
+      userAddress: await signer.getAddress(),
+      details: details,
+      transactionHash: receipt ? receipt.transactionHash : "",
+      blockNumber: receipt ? receipt.blockNumber : 0,
+    };
+    if (actionType === "Custody transferred") {
+      auditAction.approval = {
+        pending: true,
+        approved: false,
+        receiver: receiverAddress,
+        approvedBy: "",
+        approvedAt: null,
+      };
+    }
+    // Log audit trail
+    const auditTrailData = {
+      evidenceId,
+      actions: [auditAction],
+    };
+    const response = await fetch("/api/auditTrail", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(auditTrailData),
+    });
+    const resData = await response.json();
+    if (!response.ok) {
+      throw new Error(resData.error || "Failed to log audit trail");
+    }
+    return { status: true, data: resData.data };
+  } catch (err: any) {
+    console.error(err);
+    return { status: false, error: err.message };
+  }
+};
+
+// Updated signAuditAction helper function in helpers.ts
+
+export const signAuditAction = async (evidenceId: number, transactionHash: string, approver: string) => {
+  try {
+    console.log("evidenceId:", evidenceId);
+    // Ensure evidenceId is a number and pass the transactionHash and approver to the API.
+    const response = await fetch("/api/auditTrail/approve", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ evidenceId: Number(evidenceId), transactionHash, approver }),
+    });
+    const resData = await response.json();
+    if (!response.ok) {
+      throw new Error(resData.error || "Failed to sign audit action");
+    }
+    return { status: true, data: resData.data };
+  } catch (err: any) {
+    console.error("signAuditAction error:", err);
+    return { status: false, error: err.message };
+  }
+};
+
+
+// New function: getPendingApprovalForEvidence
+export const getPendingApprovalForEvidence = async (evidenceId: number, currentUser: string) => {
+  try {
+    // Ensure evidenceId is sent as number in the GET query
+    const response = await fetch(`/api/auditTrail/${Number(evidenceId)}`);
+    const resData = await response.json();
+    if (!response.ok || !resData.success) {
+      return null;
+    }
+    // Find a pending "Custody transferred" action where the receiver matches the current user.
+    const pendingAction = resData.data.actions.find((action: any) =>
+      action.actionType === "Custody transferred" &&
+      action.approval &&
+      action.approval.pending === true &&
+      action.approval.receiver.toLowerCase() === currentUser.toLowerCase()
+    );
+    return pendingAction;
+  } catch (err: any) {
+    console.error("getPendingApprovalForEvidence error:", err);
+    return null;
+  }
+};
+
 /**
  * Convert IPFS URI to a usable HTTP URL.
  */
