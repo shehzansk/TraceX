@@ -114,7 +114,7 @@ const TopBar = () => {
                     </div>
 
                     {/* Separator and Other Links */}
-                    {[{ href: "/admin", label: "Admin" }, { href: "/about", label: "About" }, { href: "/cases", label: "Case-List" }].map((link, index) => (
+                    {[{ href: "/admin", label: "Admin" }, { href: "/statistics", label: "Statistics" }, { href: "/cases", label: "Case-List" }].map((link, index) => (
                         <div key={index} className="flex items-end">
                             {/* Separator */}
                             <span className="hidden md:inline-block text-gray-500 px-4 pb-1 self-center">|</span>
