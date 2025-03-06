@@ -52,7 +52,7 @@ const TopBar = () => {
                     <nav className="flex flex-col space-y-4 px-4">
                         <a href="/" className={linkStyle}>Home</a>
                         <a href="/admin" className={linkStyle}>Admin</a>
-                        <a href="/about" className={linkStyle}>About</a>
+                        <a href="/statistics" className={linkStyle}>Statistics</a>
                         <a href="/cases" className={linkStyle}>Case-List</a>
                         {/* Chatbot Icon Option in Mobile Drawer */}
                         <div className="pt-4 border-t border-gray-300">
