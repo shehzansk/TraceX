@@ -94,6 +94,8 @@ const StatisticsPage: React.FC = () => {
 
     const iconSize = useBreakpointValue({ base: 24, md: 100 });
 
+    const iconSize = useBreakpointValue({ base: 24, md: 100 });
+
     // 1. Verify access and fetch blockchain cases.
     useEffect(() => {
         const fetchData = async () => {
