@@ -24,7 +24,7 @@ const TopBar = () => {
         <div className="relative bg-gray-100 shadow-md">
             {/* Mobile TopBar */}
             <div className="flex items-center justify-between px-4 py-2 md:hidden">
-                <Image src="/gov.png" alt="CCITR Logo" width={120} height={90} />
+                <Image src="/tracex1.png" alt="CCITR Logo" width={120} height={90} />
                 <button onClick={() => setIsSidebarOpen(true)} aria-label="Open Sidebar">
                     <Menu size={24} />
                 </button>
@@ -44,7 +44,7 @@ const TopBar = () => {
                 {/* Sidebar Content */}
                 <div className="relative bg-white w-3/4 max-w-xs h-full shadow-lg flex flex-col">
                     <div className="flex items-center justify-between p-4">
-                        <Image src="/ccitr.jpg" alt="CID Karnataka Logo" width={60} height={60} />
+                        <Image src="/tracex.png" alt="CID Karnataka Logo" width={60} height={60} />
                         <button onClick={() => setIsSidebarOpen(false)} aria-label="Close Sidebar">
                             <X size={24} />
                         </button>
@@ -82,7 +82,7 @@ const TopBar = () => {
             <div className="hidden md:flex items-end justify-between px-6 py-2">
                 {/* Left Section */}
                 <div className="flex items-center gap-4">
-                    <Image src="/gov.png" alt="CCITR Logo" width={240} height={180} />
+                    <Image src="/tracex1.png" alt="CCITR Logo" width={240} height={180} />
                     <button onClick={toggleChatbot} aria-label="Open Chat" className="relative w-20 h-20">
                         {/* Default Video (Always Looping) */}
                         <video
@@ -126,7 +126,7 @@ const TopBar = () => {
 
                 {/* Right Section */}
                 <div className="flex items-center gap-4">
-                    <Image src="/ccitr.jpg" alt="CID Karnataka Logo" width={80} height={80} />
+                    <Image src="/tracex.png" alt="CID Karnataka Logo" width={80} height={80} />
                     <div className="ml-4">
                         <ConnectButton /> {/* Now dynamically imported */}
                     </div>

@@ -351,9 +351,9 @@ export default function CasesList() {
             />
           </FormControl>
           <FormControl>
-            <FormLabel>Court ID</FormLabel>
+            <FormLabel>FIR No.</FormLabel>
             <Input
-              placeholder="Filter by court id"
+              placeholder="Filter by FIR No."
               value={courtIdFilter}
               onChange={(e) => setCourtIdFilter(e.target.value)}
             />
@@ -431,7 +431,7 @@ export default function CasesList() {
           <Thead>
             <Tr>
               <Th>Case ID</Th>
-              <Th>Court ID</Th>
+              <Th>FIR No.</Th>
               <Th>Case Type</Th>
               <Th>Description</Th>
               <Th>Status</Th>

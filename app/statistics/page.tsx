@@ -463,7 +463,7 @@ const StatisticsPage: React.FC = () => {
                         ))}
                     </Select>
                     <Select
-                        placeholder="Filter by Court ID"
+                        placeholder="Filter by FIR No."
                         value={courtIdFilter}
                         onChange={(e) => setCourtIdFilter(e.target.value)}
                         maxW="200px"
@@ -697,7 +697,7 @@ const StatisticsPage: React.FC = () => {
                         <thead>
                             <tr>
                                 <th style={{ border: "1px solid #ccc", padding: "8px" }}>Case ID</th>
-                                <th style={{ border: "1px solid #ccc", padding: "8px" }}>Court ID</th>
+                                <th style={{ border: "1px solid #ccc", padding: "8px" }}>FIR No.</th>
                                 <th style={{ border: "1px solid #ccc", padding: "8px" }}>Case Description</th>
                                 <th style={{ border: "1px solid #ccc", padding: "8px" }}>Case Type</th>
                                 <th style={{ border: "1px solid #ccc", padding: "8px" }}>Petitioner</th>

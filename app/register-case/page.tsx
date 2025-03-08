@@ -148,8 +148,8 @@ export default function RegisterCase() {
           Register Cases
         </Heading>
         <FormControl id="courtId" mb={4} isRequired>
-          <FormLabel>Court ID</FormLabel>
-          <Input placeholder="Enter court ID" ref={courtIdRef} className="mb-4 w-full px-4 py-2 shadow-md rounded transition duration-200 ease-in-out hover:shadow-lg" />
+          <FormLabel>FIR No.</FormLabel>
+          <Input placeholder="Enter FIR No." ref={courtIdRef} className="mb-4 w-full px-4 py-2 shadow-md rounded transition duration-200 ease-in-out hover:shadow-lg" />
         </FormControl>
 
         <FormControl id="caseDescription" mb={4} isRequired>

@@ -36,6 +36,7 @@ import {
   addEvidence,
   convertIPFSUriToUrl,
   getName,
+  getAdmin, // NEW: imported for admin check
   updateCustodyChain,
   signAuditAction,
   getPendingApprovalForEvidence,
@@ -78,7 +79,7 @@ export default function CaseDetails({ params }) {
   const [loading, setLoading] = useState(true);
   const [hasAccess, setHasAccess] = useState(false);
   const [canEdit, setCanEdit] = useState(false);
-  const [canUpdateCustody, setCanUpdateCustody] = useState(false); // analysts can now update custody chain too
+  const [canUpdateCustody, setCanUpdateCustody] = useState(false); // analysts can now update custody too
   const [error, setError] = useState("");
 
   const [caseDetails, setCaseDetails] = useState(null);
@@ -112,8 +113,9 @@ export default function CaseDetails({ params }) {
   const analysisInputRef = useRef(null);
   const [isUploadingAnalysis, setIsUploadingAnalysis] = useState(false);
 
-  // Store current user's wallet address and pending approval mapping.
+  // Store current user's wallet address, admin address, and pending approval mapping.
   const [currentUserAddress, setCurrentUserAddress] = useState("");
+  const [adminAddress, setAdminAddress] = useState(""); // NEW: to store admin wallet address.
   const [pendingApprovalMap, setPendingApprovalMap] = useState({});
   const [selectedAuditEvidenceId, setSelectedAuditEvidenceId] = useState(0);
 
@@ -194,6 +196,19 @@ export default function CaseDetails({ params }) {
       }
     };
     fetchCurrentUser();
+
+    // Get admin wallet address.
+    const fetchAdmin = async () => {
+      try {
+        const adminAddr = await getAdmin();
+        if (adminAddr) {
+          setAdminAddress(adminAddr.toLowerCase());
+        }
+      } catch (error) {
+        console.error("Error fetching admin address:", error);
+      }
+    };
+    fetchAdmin();
 
     // Pre-fill officer name and obtain location.
     const fetchOfficerName = async () => {
@@ -296,7 +311,7 @@ export default function CaseDetails({ params }) {
 - Ensure the report is organized with headings and sections.
 
 Case Details:
-Court ID: ${caseDetails.courtId}
+FIR No.: ${caseDetails.courtId}
 Case ID: ${caseDetails.caseId}
 Case Description: ${caseDetails.caseDescription}
 Case Type: ${caseDetails.caseType}
@@ -593,7 +608,7 @@ Timestamp: ${new Date(evidence.timestamp * 1000).toLocaleString()}`
     }
   };
 
-  // Prepare bubble chart data (chart code remains unchanged)
+  // Prepare bubble chart data.
   let bubbleEvents = [];
   if (caseDetails) {
     bubbleEvents.push({
@@ -702,7 +717,7 @@ Timestamp: ${new Date(evidence.timestamp * 1000).toLocaleString()}`
           {caseDetails && (
             <>
               <Text>
-                <strong>Court ID:</strong> {caseDetails.courtId}
+                <strong>FIR No.:</strong> {caseDetails.courtId}
               </Text>
               <Text>
                 <strong>Case Description:</strong> {caseDetails.caseDescription}
@@ -842,17 +857,22 @@ Timestamp: ${new Date(evidence.timestamp * 1000).toLocaleString()}`
                   <Button onClick={() => fetchAuditTrail(evidence.evidenceId)} colorScheme="blue" size={["sm", "md"]}>
                     View Audit Trail
                   </Button>
-                  <Button
-                    as="a"
-                    href={evidence.fileHash}
-                    download
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    colorScheme="teal"
-                    size={["sm", "md"]}
-                  >
-                    Download Evidence
-                  </Button>
+                  { // NEW: Only show Download Evidence button if current user is admin OR is the current custody owner.
+                    ((adminAddress && currentUserAddress === adminAddress) ||
+                      (evidence.owner && evidence.owner.toLowerCase() === currentUserAddress)) && (
+                      <Button
+                        as="a"
+                        href={evidence.fileHash}
+                        download
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        colorScheme="teal"
+                        size={["sm", "md"]}
+                      >
+                        Download Evidence
+                      </Button>
+                    )
+                  }
                 </HStack>
               </Box>
             ))}
@@ -939,28 +959,12 @@ Timestamp: ${new Date(evidence.timestamp * 1000).toLocaleString()}`
                 <VStack spacing={3} align="stretch" mt={4}>
                   {auditTrail.actions.map((action, index) => (
                     <Box key={index} p={3} borderWidth="1px" borderRadius="md">
-                      <Text>
-                        <strong>Action Type:</strong> {action.actionType}
-                      </Text>
-                      <Text>
-                        <strong>User Address:</strong> {action.userAddress}
-                      </Text>
-                      <Text>
-                        <strong>Timestamp:</strong> {new Date(action.timestamp).toLocaleString()}
-                      </Text>
-                      <Text>
-                        <strong>Details:</strong> {action.details}
-                      </Text>
-                      {action.actionType === "Custody transferred" && (
-                        <>
-                          <Text>
-                            <strong>Transaction Hash:</strong> {action.transactionHash}
-                          </Text>
-                          <Text>
-                            <strong>Block Number:</strong> {action.blockNumber}
-                          </Text>
-                        </>
-                      )}
+                      <Text><strong>Action Type:</strong> {action.actionType}</Text>
+                      <Text><strong>User Address:</strong> {action.userAddress}</Text>
+                      <Text><strong>Timestamp:</strong> {new Date(action.timestamp).toLocaleString()}</Text>
+                      <Text><strong>Details:</strong> {action.details}</Text>
+                      <Text><strong>Transaction Hash:</strong> {action.transactionHash}</Text>
+                      <Text><strong>Block Number:</strong> {action.blockNumber}</Text>
                       {action.actionType === "Custody transferred" && action.approval && (
                         <>
                           {action.approval.pending ? (
@@ -969,11 +973,7 @@ Timestamp: ${new Date(evidence.timestamp * 1000).toLocaleString()}`
                                 This transaction was not digitally signed
                               </Text>
                               {currentUserAddress === action.approval.receiver.toLowerCase() && (
-                                <Button
-                                  colorScheme="blue"
-                                  size="sm"
-                                  onClick={() => handleSignAuditAction(action.transactionHash)}
-                                >
+                                <Button colorScheme="blue" size="sm" onClick={() => handleSignAuditAction(action.transactionHash)}>
                                   Digitally Sign
                                 </Button>
                               )}

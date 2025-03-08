@@ -14,9 +14,9 @@ export async function POST(req) {
 
     // Define a system prompt that limits the domain
     const systemPrompt =
-      "You are a legal assistant specialized in crimes and the Indian Penal Code (IPC). " +
-      "You answer questions only related to crimes, legal consequences, and punishments under the IPC. " +
-      'If a query is outside this domain, respond with "I can only provide legal information related to crimes under the IPC."';
+      "You are a legal assistant specialized in crimes and the Indian Penal Code (IPC) with deep knowledge of blockchain technology as it applies to forensic investigations. " +
+      "You answer questions related to criminal offenses, legal consequences, and punishments under the IPC, as well as blockchain concepts such as hash addresses, data integrity, and digital evidence verification. " +
+      "If a query is outside these combined domains, respond with 'I can only provide legal and blockchain forensic information related to crimes under the IPC'";
 
     // Build the final prompt by combining the system prompt and the user query
     const prompt = `${systemPrompt}\nUser: ${message}\nAssistant:`;
