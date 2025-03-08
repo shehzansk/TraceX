@@ -1,7 +1,6 @@
 "use client";
 import { Colors } from "chart.js";
 import { useEffect, useState, useRef } from "react";
-import { ethers } from "ethers";
 import { AiOutlineCheckCircle } from "react-icons/ai";
 import {
   Box,
@@ -75,10 +74,11 @@ export default function CaseDetails({ params }) {
   const { caseId } = params;
   const toast = useToast();
 
-  // Essential states for error handling and loading.
+  // Essential states.
   const [loading, setLoading] = useState(true);
   const [hasAccess, setHasAccess] = useState(false);
   const [canEdit, setCanEdit] = useState(false);
+  const [canUpdateCustody, setCanUpdateCustody] = useState(false); // analysts can now update custody chain too
   const [error, setError] = useState("");
 
   const [caseDetails, setCaseDetails] = useState(null);
@@ -91,7 +91,35 @@ export default function CaseDetails({ params }) {
   const [aiReport, setAiReport] = useState("");
   const [tooltipVisible, setTooltipVisible] = useState(false);
 
-  // For handling modals.
+  // For evidence submission.
+  const [isSubmittingEvidence, setIsSubmittingEvidence] = useState(false);
+  const [file, setFile] = useState([]);
+  const [evidenceType, setEvidenceType] = useState(0);
+  const evidenceIdRef = useRef(null);
+  const officerNameRef = useRef(null);
+  const locationRef = useRef(null);
+  const evidenceDescriptionRef = useRef(null);
+
+  // For Update Custody Chain modal.
+  const [selectedUpdateEvidence, setSelectedUpdateEvidence] = useState(null);
+  const [updateActionType, setUpdateActionType] = useState("");
+  const [updateDescription, setUpdateDescription] = useState("");
+  const [updateReceiver, setUpdateReceiver] = useState("");
+  const [isSubmittingUpdate, setIsSubmittingUpdate] = useState(false);
+
+  // For Analysis upload in Update Custody Chain modal.
+  const [analysisDocumentUrl, setAnalysisDocumentUrl] = useState("");
+  const analysisInputRef = useRef(null);
+  const [isUploadingAnalysis, setIsUploadingAnalysis] = useState(false);
+
+  // Store current user's wallet address and pending approval mapping.
+  const [currentUserAddress, setCurrentUserAddress] = useState("");
+  const [pendingApprovalMap, setPendingApprovalMap] = useState({});
+  const [selectedAuditEvidenceId, setSelectedAuditEvidenceId] = useState(0);
+
+  const { mutateAsync: upload } = useStorageUpload();
+
+  // Chakra UI modals.
   const {
     isOpen: isEvidenceOpen,
     onOpen: onEvidenceOpen,
@@ -113,34 +141,12 @@ export default function CaseDetails({ params }) {
     onClose: onUpdateChainClose,
   } = useDisclosure();
 
-  // For evidence submission.
-  const [isSubmittingEvidence, setIsSubmittingEvidence] = useState(false);
-  const [file, setFile] = useState([]);
-  const [evidenceType, setEvidenceType] = useState(0);
-  const evidenceIdRef = useRef(null);
-  const officerNameRef = useRef(null);
-  const locationRef = useRef(null);
-  const evidenceDescriptionRef = useRef(null);
-
-  // For Update Custody Chain modal.
-  const [selectedUpdateEvidence, setSelectedUpdateEvidence] = useState(null);
-  const [updateActionType, setUpdateActionType] = useState("");
-  const [updateDescription, setUpdateDescription] = useState("");
-  const [updateReceiver, setUpdateReceiver] = useState("");
-  const [isSubmittingUpdate, setIsSubmittingUpdate] = useState(false);
-
-  // Store current user's wallet address and pending approval mapping.
-  const [currentUserAddress, setCurrentUserAddress] = useState("");
-  const [pendingApprovalMap, setPendingApprovalMap] = useState({});
-  // New state to correctly store the evidenceId for which the audit trail is being viewed.
-  const [selectedAuditEvidenceId, setSelectedAuditEvidenceId] = useState(0);
-
   // Toggle the tooltip.
   const handleClick = () => {
     setTooltipVisible(!tooltipVisible);
   };
 
-  // Initial data fetch, similar to original.
+  // Initial data fetch.
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -153,7 +159,9 @@ export default function CaseDetails({ params }) {
         }
         const editAccess = await isCollectorOrAdmin();
         setCanEdit(editAccess);
-        setFilteredEvidences([]); // Reset before load.
+        const custodyAccess = await isAtLeastAnalyst(); // allow analysts for custody transfer
+        setCanUpdateCustody(custodyAccess);
+        setFilteredEvidences([]);
         const caseResponse = await getCaseById(caseId);
         const evidenceResponse = await getEvidences(caseId);
         if (caseResponse.status) {
@@ -187,7 +195,7 @@ export default function CaseDetails({ params }) {
     };
     fetchCurrentUser();
 
-    // Pre-fill officer name and location in evidence submission.
+    // Pre-fill officer name and obtain location.
     const fetchOfficerName = async () => {
       if (officerNameRef.current && window.ethereum) {
         const accounts = await window.ethereum.request({ method: "eth_accounts" });
@@ -249,7 +257,7 @@ export default function CaseDetails({ params }) {
   const fetchAuditTrail = async (evidenceId) => {
     try {
       setAuditLoading(true);
-      setSelectedAuditEvidenceId(evidenceId); // Save the evidenceId for later use.
+      setSelectedAuditEvidenceId(evidenceId);
       const response = await axios.get(`/api/auditTrail/${evidenceId}`);
       if (response.data.success) {
         setAuditTrail(response.data.data);
@@ -280,8 +288,13 @@ export default function CaseDetails({ params }) {
   const generateAIReport = async () => {
     try {
       onReportOpen();
-      const caseData = { caseDetails, evidences };
-      const prompt = `You are an AI assistant tasked with generating a comprehensive audit report for a legal case to be presented in Indian courts. Use the provided case details and evidence data to create a formal report.
+      const prompt = `Instructions:
+- Summarize the case and its significance.
+- Detail each piece of evidence and its relevance.
+- Present findings in a logical, clear, and concise manner.
+- Use formal language suitable for a court presentation.
+- Ensure the report is organized with headings and sections.
+
 Case Details:
 Court ID: ${caseDetails.courtId}
 Case ID: ${caseDetails.caseId}
@@ -304,12 +317,7 @@ Evidence Type: ${evidence.evidenceType}
 Timestamp: ${new Date(evidence.timestamp * 1000).toLocaleString()}`
           )
           .join("\n")}
-Instructions:
-- Summarize the case and its significance.
-- Detail each piece of evidence and its relevance.
-- Present findings in a logical, clear, and concise manner.
-- Use formal language suitable for a court presentation.
-- Ensure the report is organized with headings and sections.`;
+`;
       const llm = new ChatGoogleGenerativeAI({
         model: "gemini-1.5-pro",
         temperature: 0,
@@ -334,6 +342,7 @@ Instructions:
     }
   };
 
+  // Download PDF report.
   const downloadPDF = () => {
     const doc = new jsPDF();
     doc.setFontSize(16);
@@ -344,7 +353,44 @@ Instructions:
     doc.save(`AI_Audit_Report_Case_${caseId}.pdf`);
   };
 
-  // Handler for the "Update Custody Chain" modal submission.
+  // Handler for analysis file upload trigger.
+  const handleTriggerAnalysisUpload = () => {
+    if (analysisInputRef.current) {
+      analysisInputRef.current.click();
+    }
+  };
+
+  // Handler for analysis file change.
+  const handleAnalysisFileChange = async (e) => {
+    if (e.target.files && e.target.files.length > 0) {
+      setIsUploadingAnalysis(true);
+      try {
+        const file = e.target.files[0];
+        const uris = await upload({ data: [file] });
+        const uploadedUrl = convertIPFSUriToUrl(uris[0]);
+        setAnalysisDocumentUrl(uploadedUrl);
+        toast({
+          title: "Analysis document uploaded successfully.",
+          status: "success",
+          duration: 5000,
+          isClosable: true,
+        });
+      } catch (err) {
+        console.error(err);
+        toast({
+          title: "Error uploading analysis.",
+          description: err.message || "An unknown error occurred.",
+          status: "error",
+          duration: 5000,
+          isClosable: true,
+        });
+      } finally {
+        setIsUploadingAnalysis(false);
+      }
+    }
+  };
+
+  // Handler for "Update Custody Chain" modal submission.
   const handleUpdateChainSubmit = async () => {
     setIsSubmittingUpdate(true);
     try {
@@ -361,18 +407,28 @@ Instructions:
         setIsSubmittingUpdate(false);
         return;
       }
+      if (updateActionType === "Custody transferred" && !updateReceiver) {
+        toast({
+          title: "Receiver wallet address is required for custody transfer.",
+          status: "error",
+          duration: 5000,
+          isClosable: true,
+        });
+        setIsSubmittingUpdate(false);
+        return;
+      }
+      if (updateActionType === "Analysis updated" && !analysisDocumentUrl) {
+        toast({
+          title: "Please upload analysis document.",
+          status: "error",
+          duration: 5000,
+          isClosable: true,
+        });
+        setIsSubmittingUpdate(false);
+        return;
+      }
       let receiver = "";
       if (updateActionType === "Custody transferred") {
-        if (!updateReceiver) {
-          toast({
-            title: "Receiver wallet address is required for custody transfer.",
-            status: "error",
-            duration: 5000,
-            isClosable: true,
-          });
-          setIsSubmittingUpdate(false);
-          return;
-        }
         receiver = updateReceiver.trim();
       }
       const response = await updateCustodyChain(
@@ -380,7 +436,8 @@ Instructions:
         selectedUpdateEvidence.evidenceId,
         updateActionType,
         updateDescription,
-        receiver
+        updateActionType === "Custody transferred" ? receiver : undefined,
+        updateActionType === "Analysis updated" ? analysisDocumentUrl : undefined
       );
       if (response.status) {
         toast({
@@ -401,7 +458,7 @@ Instructions:
         const match = response.error.match(/reason="([^"]+)"/);
         errorMsg = match ? match[1] : response.error;
         toast({
-          title: "Failed to transfer custody.",
+          title: "Failed to update custody chain.",
           description: errorMsg,
           status: "error",
           duration: 5000,
@@ -422,7 +479,7 @@ Instructions:
     }
   };
 
-  // Handler for digitally signing an audit action using its transactionHash.
+  // Handler for digitally signing an audit action.
   const handleSignAuditAction = async (transactionHash) => {
     try {
       const response = await signAuditAction(
@@ -453,12 +510,7 @@ Instructions:
     }
   };
 
-  const { mutateAsync: upload } = useStorageUpload();
-  const uploadDataToIPFS = async () => {
-    const uris = await upload({ data: file });
-    return uris[0];
-  };
-
+  // Handler for evidence file upload.
   const handleAddEvidence = async () => {
     setIsSubmittingEvidence(true);
     try {
@@ -478,8 +530,8 @@ Instructions:
         setIsSubmittingEvidence(false);
         return;
       }
-      const evidenceId = parseInt(evidenceIdRef.current.value);
-      if (isNaN(evidenceId) || evidenceId < 100000 || evidenceId > 999999) {
+      const evidenceIdParsed = parseInt(evidenceIdRef.current.value);
+      if (isNaN(evidenceIdParsed) || evidenceIdParsed < 100000 || evidenceIdParsed > 999999) {
         toast({
           title: "Invalid Evidence ID",
           description: "Evidence ID must be a 6-digit number.",
@@ -490,11 +542,11 @@ Instructions:
         setIsSubmittingEvidence(false);
         return;
       }
-      let ipfsLink = await uploadDataToIPFS();
-      ipfsLink = convertIPFSUriToUrl(ipfsLink);
+      let ipfsLinks = await upload({ data: file });
+      let ipfsLink = convertIPFSUriToUrl(ipfsLinks[0]);
       const response = await addEvidence(
         caseId,
-        evidenceId,
+        evidenceIdParsed,
         officerNameRef.current.value,
         locationRef.current.value,
         evidenceDescriptionRef.current.value,
@@ -541,6 +593,7 @@ Instructions:
     }
   };
 
+  // Prepare bubble chart data (chart code remains unchanged)
   let bubbleEvents = [];
   if (caseDetails) {
     bubbleEvents.push({
@@ -586,7 +639,6 @@ Instructions:
       },
     ],
   };
-
   const bubbleOptions = {
     responsive: true,
     maintainAspectRatio: false,
@@ -621,7 +673,6 @@ Instructions:
     },
   };
 
-  // Render loading or access error screens.
   if (loading) {
     return (
       <Box minH="100vh" display="flex" alignItems="center" justifyContent="center">
@@ -755,7 +806,10 @@ Instructions:
                   </a>
                   <span className="relative inline-block ml-1 group" onClick={handleClick}>
                     <AiOutlineCheckCircle className="text-green-500 text-m cursor-pointer" />
-                    <span className={`absolute bottom-full left-1/2 transform -translate-x-1/2 mb-1 w-40 bg-black text-white text-center text-xs rounded py-1 transition-opacity duration-300 ${tooltipVisible ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`}>
+                    <span
+                      className={`absolute bottom-full left-1/2 transform -translate-x-1/2 mb-1 w-40 bg-black text-white text-center text-xs rounded py-1 transition-opacity duration-300 ${tooltipVisible ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+                        }`}
+                    >
                       Validated with EtherScan
                     </span>
                   </span>
@@ -769,7 +823,7 @@ Instructions:
                   </Text>
                 )}
                 <HStack spacing={["2", "4"]} justify={["center", "flex-end"]} mt={5} mb={4} wrap={["wrap", "nowrap"]}>
-                  {canEdit && (
+                  {canUpdateCustody && (
                     <Button
                       colorScheme="purple"
                       size={["sm", "md"]}
@@ -778,17 +832,14 @@ Instructions:
                         setUpdateActionType("");
                         setUpdateDescription("");
                         setUpdateReceiver("");
+                        setAnalysisDocumentUrl("");
                         onUpdateChainOpen();
                       }}
                     >
                       Update Custody Chain
                     </Button>
                   )}
-                  <Button
-                    onClick={() => fetchAuditTrail(evidence.evidenceId)}
-                    colorScheme="blue"
-                    size={["sm", "md"]}
-                  >
+                  <Button onClick={() => fetchAuditTrail(evidence.evidenceId)} colorScheme="blue" size={["sm", "md"]}>
                     View Audit Trail
                   </Button>
                   <Button
@@ -856,9 +907,7 @@ Instructions:
               <Input
                 type="file"
                 accept=""
-                onChange={(e) =>
-                  setFile(e.target.files ? Array.from(e.target.files) : [])
-                }
+                onChange={(e) => setFile(e.target.files ? Array.from(e.target.files) : [])}
               />
             </FormControl>
           </ModalBody>
@@ -884,16 +933,34 @@ Instructions:
               <Spinner />
             ) : auditTrail ? (
               <Box>
-                <Text><strong>Evidence ID:</strong> {auditTrail.evidenceId}</Text>
+                <Text>
+                  <strong>Evidence ID:</strong> {auditTrail.evidenceId}
+                </Text>
                 <VStack spacing={3} align="stretch" mt={4}>
                   {auditTrail.actions.map((action, index) => (
                     <Box key={index} p={3} borderWidth="1px" borderRadius="md">
-                      <Text><strong>Action Type:</strong> {action.actionType}</Text>
-                      <Text><strong>User Address:</strong> {action.userAddress}</Text>
-                      <Text><strong>Timestamp:</strong> {new Date(action.timestamp).toLocaleString()}</Text>
-                      <Text><strong>Details:</strong> {action.details}</Text>
-                      <Text><strong>Transaction Hash:</strong> {action.transactionHash}</Text>
-                      <Text><strong>Block Number:</strong> {action.blockNumber}</Text>
+                      <Text>
+                        <strong>Action Type:</strong> {action.actionType}
+                      </Text>
+                      <Text>
+                        <strong>User Address:</strong> {action.userAddress}
+                      </Text>
+                      <Text>
+                        <strong>Timestamp:</strong> {new Date(action.timestamp).toLocaleString()}
+                      </Text>
+                      <Text>
+                        <strong>Details:</strong> {action.details}
+                      </Text>
+                      {action.actionType === "Custody transferred" && (
+                        <>
+                          <Text>
+                            <strong>Transaction Hash:</strong> {action.transactionHash}
+                          </Text>
+                          <Text>
+                            <strong>Block Number:</strong> {action.blockNumber}
+                          </Text>
+                        </>
+                      )}
                       {action.actionType === "Custody transferred" && action.approval && (
                         <>
                           {action.approval.pending ? (
@@ -913,10 +980,22 @@ Instructions:
                             </>
                           ) : (
                             <Text color="green.500" fontSize="sm">
-                              This transaction was approved by {action.approval.approvedBy}<br />at {action.approval.approvedAt}
+                              This transaction was approved by {action.approval.approvedBy}
+                              <br />
+                              at {action.approval.approvedAt}
                             </Text>
                           )}
                         </>
+                      )}
+                      {action.actionType === "Analysis updated" && action.analysisDocumentUrl && (
+                        <Button
+                          colorScheme="purple"
+                          size="sm"
+                          mt={2}
+                          onClick={() => window.open(action.analysisDocumentUrl, "_blank")}
+                        >
+                          Download Analysis
+                        </Button>
                       )}
                     </Box>
                   ))}
@@ -967,7 +1046,11 @@ Instructions:
               <Select
                 placeholder="Select action type"
                 value={updateActionType}
-                onChange={(e) => setUpdateActionType(e.target.value)}
+                onChange={(e) => {
+                  setUpdateActionType(e.target.value);
+                  // Reset analysis document URL when action type changes.
+                  setAnalysisDocumentUrl("");
+                }}
               >
                 <option value="Analysis updated">Analysis updated</option>
                 <option value="Custody transferred">Custody transferred</option>
@@ -995,6 +1078,25 @@ Instructions:
                     onChange={(e) => setUpdateReceiver(e.target.value)}
                   />
                 </FormControl>
+              </>
+            )}
+            {updateActionType === "Analysis updated" && (
+              <>
+                <Button colorScheme="blue" onClick={handleTriggerAnalysisUpload} mb={4} isLoading={isUploadingAnalysis}>
+                  Upload Analysis
+                </Button>
+                <input
+                  type="file"
+                  ref={analysisInputRef}
+                  style={{ display: "none" }}
+                  accept="application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain"
+                  onChange={handleAnalysisFileChange}
+                />
+                {analysisDocumentUrl && (
+                  <Text fontSize="sm" color="green.500">
+                    Analysis document uploaded.
+                  </Text>
+                )}
               </>
             )}
           </ModalBody>

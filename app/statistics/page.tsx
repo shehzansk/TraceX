@@ -92,6 +92,8 @@ const StatisticsPage: React.FC = () => {
     // Determine if current screen is mobile
     const isMobile = useBreakpointValue({ base: true, md: false });
 
+    const iconSize = useBreakpointValue({ base: 24, md: 100 });
+
     // 1. Verify access and fetch blockchain cases.
     useEffect(() => {
         const fetchData = async () => {
@@ -491,7 +493,7 @@ const StatisticsPage: React.FC = () => {
                         <option value="desc">Descending</option>
                     </Select>
                     <Button colorScheme="blue" onClick={handleDownloadPDF}>
-                        <Download size={100} />
+                        <Download size={iconSize} />
                     </Button>
                 </Flex>
                 <Text mt={4} color="gray.600">

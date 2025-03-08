@@ -458,13 +458,14 @@ export const transferEvidenceCustody = async (
   }
 };
 
-// New function: updateCustodyChain
+// helpers.ts
 export const updateCustodyChain = async (
   caseId: number,
   evidenceId: number,
   actionType: string,
   details: string,
-  receiverAddress?: string
+  receiverAddress?: string,
+  analysisDocumentUrl?: string
 ) => {
   try {
     if (!ethereumService.contract || !ethereumService.signer) {
@@ -498,6 +499,9 @@ export const updateCustodyChain = async (
         approvedAt: null,
       };
     }
+    if (actionType === "Analysis updated" && analysisDocumentUrl) {
+      auditAction.analysisDocumentUrl = analysisDocumentUrl;
+    }
     // Log audit trail
     const auditTrailData = {
       evidenceId,
@@ -518,6 +522,7 @@ export const updateCustodyChain = async (
     return { status: false, error: err.message };
   }
 };
+
 
 // Updated signAuditAction helper function in helpers.ts
 
