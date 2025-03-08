@@ -25,7 +25,6 @@ export default function RegisterCase() {
   const petitionerRef = useRef<HTMLInputElement>(null);
   const respondentRef = useRef<HTMLInputElement>(null);
   const startDateRef = useRef<HTMLInputElement>(null);
-  const statusRef = useRef<HTMLSelectElement>(null);
 
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
@@ -61,8 +60,7 @@ export default function RegisterCase() {
         !caseTypeRef.current?.value ||
         !petitionerRef.current?.value ||
         !respondentRef.current?.value ||
-        !startDateRef.current?.value ||
-        !statusRef.current?.value
+        !startDateRef.current?.value
       ) {
         toast({
           title: "All fields are required.",
@@ -74,6 +72,9 @@ export default function RegisterCase() {
         return;
       }
 
+      // The default status for every case is "Open"
+      const defaultStatus = "Open";
+
       const response = await addCase(
         courtIdRef.current.value,
         caseDescriptionRef.current.value,
@@ -81,7 +82,7 @@ export default function RegisterCase() {
         petitionerRef.current.value,
         respondentRef.current.value,
         startDateRef.current.value,
-        statusRef.current.value
+        defaultStatus
       );
 
       if (response.status) {
@@ -97,7 +98,6 @@ export default function RegisterCase() {
         petitionerRef.current.value = "";
         respondentRef.current.value = "";
         startDateRef.current.value = "";
-        statusRef.current.value = "";
         caseTypeRef.current.value = "";
       } else {
         toast({
@@ -149,7 +149,11 @@ export default function RegisterCase() {
         </Heading>
         <FormControl id="courtId" mb={4} isRequired>
           <FormLabel>FIR No.</FormLabel>
-          <Input placeholder="Enter FIR No." ref={courtIdRef} className="mb-4 w-full px-4 py-2 shadow-md rounded transition duration-200 ease-in-out hover:shadow-lg" />
+          <Input
+            placeholder="Enter FIR No."
+            ref={courtIdRef}
+            className="mb-4 w-full px-4 py-2 shadow-md rounded transition duration-200 ease-in-out hover:shadow-lg"
+          />
         </FormControl>
 
         <FormControl id="caseDescription" mb={4} isRequired>
@@ -173,27 +177,29 @@ export default function RegisterCase() {
 
         <FormControl id="petitioner" mb={4} isRequired>
           <FormLabel>Petitioner</FormLabel>
-          <Input placeholder="Enter petitioner name" ref={petitionerRef} className="mb-4 w-full px-4 py-2 shadow-md rounded transition duration-200 ease-in-out hover:shadow-lg" />
+          <Input
+            placeholder="Enter petitioner name"
+            ref={petitionerRef}
+            className="mb-4 w-full px-4 py-2 shadow-md rounded transition duration-200 ease-in-out hover:shadow-lg"
+          />
         </FormControl>
 
         <FormControl id="respondent" mb={4} isRequired>
           <FormLabel>Respondent</FormLabel>
-          <Input placeholder="Enter respondent name" ref={respondentRef} className="mb-4 w-full px-4 py-2 shadow-md rounded transition duration-200 ease-in-out hover:shadow-lg" />
+          <Input
+            placeholder="Enter respondent name"
+            ref={respondentRef}
+            className="mb-4 w-full px-4 py-2 shadow-md rounded transition duration-200 ease-in-out hover:shadow-lg"
+          />
         </FormControl>
 
         <FormControl id="startDateTime" mb={4} isRequired>
           <FormLabel>Start Date</FormLabel>
-          <Input type="date" ref={startDateRef} className="mb-4 w-full px-4 py-2 shadow-md rounded transition duration-200 ease-in-out hover:shadow-lg" />
-        </FormControl>
-
-        <FormControl id="status" mb={6} isRequired>
-          <FormLabel>Status</FormLabel>
-          <Select placeholder="Select status" ref={statusRef}>
-            <option value="Open">Open</option>
-            <option value="Under Investigation">Under Investigation</option>
-            <option value="Closed">Closed</option>
-            {/* Add more options as needed */}
-          </Select>
+          <Input
+            type="date"
+            ref={startDateRef}
+            className="mb-4 w-full px-4 py-2 shadow-md rounded transition duration-200 ease-in-out hover:shadow-lg"
+          />
         </FormControl>
 
         <Button

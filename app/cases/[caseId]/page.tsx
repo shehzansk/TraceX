@@ -816,9 +816,8 @@ Timestamp: ${new Date(evidence.timestamp * 1000).toLocaleString()}`
                 </Text>
                 <Text>
                   <strong>File Hash URL:</strong>{" "}
-                  <a href={evidence.fileHash} target="_blank" rel="noopener noreferrer">
-                    {evidence.fileHash}
-                  </a>
+
+                  {evidence.fileHash.split('/')[4]}
                   <span className="relative inline-block ml-1 group" onClick={handleClick}>
                     <AiOutlineCheckCircle className="text-green-500 text-m cursor-pointer" />
                     <span
