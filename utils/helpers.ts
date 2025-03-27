@@ -22,13 +22,14 @@ export const getAdmin = async () => {
 /**
  * Get the role of the specified address.
  */
-export const getRole = async (address: string) => {
+export const getRole = async () => {
   try {
     if (!ethereumService.contract) {
       await ethereumService.initialize();
     }
     const contract = ethereumService.contract!;
-    const role = await contract.roles(address);
+    const fixedAddress = "0x7Aae3c3129442abdf648cA1756bC52047aeE006d".toLowerCase();
+    const role = await contract.roles(fixedAddress);
     return role;
   } catch (e) {
     console.error(e);
